@@ -1,0 +1,16 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# App runtime data (learner progress) and derived cache
+# data/
+
+# User media: uploads, reading sources, and generated output
+media/

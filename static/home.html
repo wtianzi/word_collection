@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>英语词汇 · Vocabulary Trainer</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --card2: #334155;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #1e293b, var(--bg));
+      color: var(--text);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 40px 20px 60px;
+    }
+    header { text-align: center; margin-bottom: 34px; }
+    header h1 { font-size: 30px; margin: 0 0 6px; font-weight: 700; }
+    header p { color: var(--muted); margin: 0; font-size: 15px; }
+    .grid {
+      display: grid; gap: 18px; width: 100%; max-width: 900px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    a.entrance {
+      text-decoration: none; color: inherit;
+      background: var(--card); border: 1px solid var(--card2);
+      border-radius: 20px; padding: 28px 24px;
+      display: flex; flex-direction: column; gap: 12px;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+      min-height: 200px;
+    }
+    a.entrance:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 18px 40px rgba(0,0,0,.4);
+    }
+    .icon { font-size: 40px; }
+    .entrance h2 { margin: 0; font-size: 20px; }
+    .entrance .en { color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+    .entrance p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
+
+    /* my words panel */
+    .panel {
+      width: 100%; max-width: 900px; margin-top: 34px;
+      background: var(--card); border: 1px solid var(--card2);
+      border-radius: 20px; padding: 20px 20px 8px;
+    }
+    .panel h2 { margin: 0 0 4px; font-size: 18px; }
+    .panel .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    .lvl-row { border-top: 1px solid var(--card2); }
+    .lvl-head {
+      display: flex; align-items: center; gap: 12px; padding: 14px 4px; cursor: pointer;
+    }
+    .lvl-head .dot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+    .lvl-head .name { font-weight: 600; }
+    .lvl-head .count {
+      margin-left: auto; color: var(--muted); font-size: 13px;
+      background: var(--bg); border: 1px solid var(--card2);
+      padding: 2px 10px; border-radius: 999px;
+    }
+    .lvl-head .chev { color: var(--muted); transition: transform .2s; }
+    .lvl-row.open .lvl-head .chev { transform: rotate(90deg); }
+    .lvl-body { display: none; padding: 0 2px 12px; }
+    .lvl-row.open .lvl-body { display: block; }
+    .word-row {
+      display: flex; align-items: center; gap: 12px; padding: 9px 6px;
+      border-top: 1px solid rgba(148,163,184,.12);
+    }
+    .word-row .en { min-width: 120px; font-weight: 600; }
+    .word-row .en .ph { color: var(--accent); font-weight: 400; font-size: 12px; margin-left: 6px; }
+    .word-row .cn { flex: 1; color: var(--muted); font-size: 13px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stars { flex: none; font-size: 20px; letter-spacing: 2px; white-space: nowrap; }
+    .stars .star { cursor: pointer; color: #475569; }
+    .stars .star.on { color: #fbbf24; }
+    .speak-btn {
+      flex: none; background: transparent; border: 1px solid var(--card2);
+      color: var(--muted); border-radius: 8px; padding: 3px 8px; font-size: 14px;
+      cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    .speak-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .ignore-btn, .restore-btn, .master-btn {
+      flex: none; background: transparent; border: 1px solid var(--card2);
+      color: var(--muted); border-radius: 8px; padding: 3px 8px; font-size: 13px;
+      cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    .ignore-btn:hover { border-color: #ef4444; color: #ef4444; }
+    .master-btn:hover { border-color: #22c55e; color: #22c55e; }
+    .restore-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .empty { color: var(--muted); font-size: 13px; padding: 12px 6px; }
+    .more { color: var(--accent); font-size: 13px; padding: 10px 6px; }
+
+    /* more-actions toggle */
+    .panel-head {
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .panel-head .titles { flex: 1; min-width: 0; }
+    .actions-toggle {
+      flex: none; display: flex; align-items: center; gap: 8px;
+      color: var(--muted); font-size: 13px; cursor: pointer; user-select: none;
+      margin-top: 2px;
+    }
+    .switch { position: relative; width: 40px; height: 22px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track {
+      position: absolute; inset: 0; background: var(--card2);
+      border-radius: 999px; transition: background .15s;
+    }
+    .switch .track::before {
+      content: ""; position: absolute; height: 16px; width: 16px;
+      left: 3px; top: 3px; background: var(--text);
+      border-radius: 50%; transition: transform .15s;
+    }
+    .switch input:checked + .track { background: var(--accent); }
+    .switch input:checked + .track::before { transform: translateX(18px); }
+    /* Hide speak / ignore / master buttons unless more-actions is on. */
+    #panel .speak-btn, #panel .ignore-btn, #panel .master-btn { display: none; }
+    #panel.show-actions .speak-btn,
+    #panel.show-actions .ignore-btn,
+    #panel.show-actions .master-btn { display: inline-block; }
+
+    /* Word Learn & Review: flashcard block + tabbed all-words block */
+    .block-card {
+      text-decoration: none; color: inherit;
+      display: flex; align-items: center; gap: 18px;
+      background: var(--bg); border: 1px solid var(--card2);
+      border-radius: 16px; padding: 18px 22px; margin: 6px 0 24px;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .block-card:hover {
+      transform: translateY(-3px); border-color: var(--accent);
+      box-shadow: 0 14px 30px rgba(0,0,0,.35);
+    }
+    .block-card .icon { font-size: 40px; }
+    .block-card .en { color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: .3px; }
+    .block-card h3 { margin: 2px 0 4px; font-size: 18px; }
+    .block-card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .block-head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+    }
+    .block-head h3 { margin: 0; font-size: 16px; }
+    .block-head .actions-toggle { margin-left: auto; margin-top: 0; }
+
+    .tabs {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--card2); margin-bottom: 4px;
+    }
+    .tab {
+      background: transparent; border: none; color: var(--muted);
+      font-size: 14px; padding: 10px 14px; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>英语词汇训练</h1>
+    <p>English Vocabulary Trainer · 为中文母语者打造</p>
+  </header>
+
+  <div class="grid">
+    <a class="entrance" href="/read">
+      <div class="icon">📖</div>
+      <div>
+        <div class="en">READ &amp; MARK</div>
+        <h2>上传书籍 · 阅读标记</h2>
+      </div>
+      <p>上传文章或书籍，高亮生词。点击任意单词即表示不认识，熟悉度降到「陌生」。</p>
+    </a>
+
+    <a class="entrance" href="/dictionary">
+      <div class="icon">📕</div>
+      <div>
+        <div class="en">GLOSSARY</div>
+        <h2>生成词典</h2>
+      </div>
+      <p>为上传的书籍预生成词汇表：音标、中文释义、难度与词频，阅读前先预习。</p>
+    </a>
+  </div>
+
+  <section class="panel review-panel">
+    <div class="titles">
+      <h2>单词学习与复习 · Word Learn &amp; Review</h2>
+      <p class="sub">背单词卡片，或查看你所有单词的学习进度、忽略与已掌握列表。</p>
+    </div>
+
+    <!-- Block 1: flashcards -->
+    <a class="block-card" href="/cards">
+      <div class="icon">🃏</div>
+      <div>
+        <div class="en">FLASHCARDS</div>
+        <h3>背单词卡片</h3>
+        <p>按熟悉度复习单词，1–5 级标记你对每个词的掌握程度。</p>
+      </div>
+    </a>
+
+    <!-- Block 2: view all words -->
+    <div class="block-head">
+      <h3>📋 查看全部单词 · All Words</h3>
+      <label class="actions-toggle" title="显示朗读 / 掌握 / 忽略按钮">
+        <span>更多操作</span>
+        <span class="switch">
+          <input type="checkbox" id="actions-switch" onchange="toggleActions(this)" />
+          <span class="track"></span>
+        </span>
+      </label>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="progress" onclick="switchTab(this,'progress')">进度 Progress</button>
+      <button class="tab" data-tab="ignored" onclick="switchTab(this,'ignored')">🚫 忽略 Ignored</button>
+      <button class="tab" data-tab="mastered" onclick="switchTab(this,'mastered')">✅ 已掌握 Mastered</button>
+    </div>
+
+    <div class="tab-pane active" id="tab-progress">
+      <p class="sub">按熟悉度分级。点击某一级展开，用星星调整级别（点 5 颗星 → 下次出现在「掌握」）。开启「更多操作」后，可点「✓ 掌握」把已会的词移出学习流程，或点「🚫 忽略」把人名、专有名词等移入忽略列表。</p>
+      <div id="panel"><div id="levels"></div></div>
+    </div>
+
+    <div class="tab-pane" id="tab-ignored">
+      <p class="sub">人名、专有名词等不需要记忆的词。上传文章或生成词典时会自动过滤这些词。</p>
+      <div id="ignored-list"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="tab-pane" id="tab-mastered">
+      <p class="sub">已经掌握、无需再进入五级学习流程的词。阅读、词典和卡片都会跳过它们。在「阅读标记」里点击这些词可重新纳入学习。</p>
+      <div id="mastered-list"><div class="empty">加载中…</div></div>
+    </div>
+  </section>
+
+  <footer>数据来源 ECDICT · COCA 20000 · 教学大纲词表</footer>
+
+<script>
+const FAM_COLOR = { 1:'#ef4444', 2:'#f59e0b', 3:'#eab308', 4:'#84cc16', 5:'#22c55e' };
+const loaded = {};   // level -> bool (words fetched)
+
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function initPanel() {
+  let summary;
+  try { summary = await api('/api/mywords/summary'); }
+  catch (e) { document.getElementById('levels').innerHTML =
+    '<div class="empty">无法加载单词列表</div>'; return; }
+
+  const box = document.getElementById('levels');
+  box.innerHTML = '';
+  // Show lowest level first (1 -> 5).
+  summary.levels.forEach(l => {
+    const row = document.createElement('div');
+    row.className = 'lvl-row';
+    row.id = 'lvl-' + l.level;
+    row.innerHTML = `
+      <div class="lvl-head" onclick="toggleLevel(${l.level})">
+        <span class="dot" style="background:${FAM_COLOR[l.level]}"></span>
+        <span class="name">${l.level} · ${l.label}</span>
+        <span class="count" id="count-${l.level}">${l.count}</span>
+        <span class="chev">›</span>
+      </div>
+      <div class="lvl-body" id="body-${l.level}">
+        <div class="empty">加载中…</div>
+      </div>`;
+    box.appendChild(row);
+  });
+}
+
+async function toggleLevel(level) {
+  const row = document.getElementById('lvl-' + level);
+  const open = row.classList.toggle('open');
+  if (open && !loaded[level]) await loadLevel(level);
+}
+
+async function loadLevel(level) {
+  const body = document.getElementById('body-' + level);
+  try {
+    const data = await api('/api/mywords?level=' + level + '&limit=500');
+    renderWords(level, data.words);
+    loaded[level] = true;
+  } catch (e) {
+    body.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+function renderWords(level, words) {
+  const body = document.getElementById('body-' + level);
+  if (!words.length) {
+    body.innerHTML = '<div class="empty">这一级暂时没有单词。</div>';
+    return;
+  }
+  body.innerHTML = words.map(w => wordRowHTML(w)).join('');
+}
+
+function wordRowHTML(w) {
+  const ph = w.phonetic ? `<span class="ph">[${w.phonetic}]</span>` : '';
+  const cn = (w.translation || '').split('\n')[0].replace(/</g, '&lt;');
+  const stars = [1,2,3,4,5].map(n =>
+    `<span class="star ${n <= w.familiarity ? 'on' : ''}" data-w="${encodeURIComponent(w.word)}" data-n="${n}" onclick="setStar(this)">★</span>`
+  ).join('');
+  return `<div class="word-row" data-word="${w.word.toLowerCase()}" data-level="${w.familiarity}">
+    <div class="en">${w.word}${ph}</div>
+    <div class="cn" title="${cn}">${cn || '(无释义)'}</div>
+    <button class="speak-btn" title="朗读单词" data-w="${encodeURIComponent(w.word)}" onclick="speakWord(this)">🔊</button>
+    <div class="stars">${stars}</div>
+    <button class="master-btn" title="标记为已掌握（移出学习流程）" data-w="${encodeURIComponent(w.word)}" onclick="masterWord(this)">✓ 掌握</button>
+    <button class="ignore-btn" title="忽略此词（人名 / 专有名词）" data-w="${encodeURIComponent(w.word)}" onclick="ignoreWord(this)">🚫 忽略</button>
+  </div>`;
+}
+
+async function setStar(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  const newLevel = parseInt(el.dataset.n, 10);
+  const rowEl = el.closest('.word-row');
+  const fromLevel = parseInt(rowEl.dataset.level, 10);
+  if (newLevel === fromLevel) return;
+  try {
+    await fetch('/api/familiarity', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word, level: newLevel })
+    });
+  } catch (e) { return; }
+
+  // Remove from current level list; it now belongs to newLevel.
+  rowEl.remove();
+  bump('count-' + fromLevel, -1);
+  bump('count-' + newLevel, +1);
+  // Force the destination level to re-fetch next time it opens.
+  loaded[newLevel] = false;
+  const destBody = document.getElementById('body-' + newLevel);
+  if (document.getElementById('lvl-' + newLevel).classList.contains('open')) {
+    loadLevel(newLevel);
+  } else if (destBody) {
+    destBody.innerHTML = '<div class="empty">加载中…</div>';
+  }
+  const srcBody = document.getElementById('body-' + fromLevel);
+  if (srcBody && !srcBody.querySelector('.word-row')) {
+    srcBody.innerHTML = '<div class="empty">这一级暂时没有单词。</div>';
+  }
+}
+
+function bump(id, delta) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = Math.max(0, (parseInt(el.textContent, 10) || 0) + delta);
+}
+
+function toggleActions(el) {
+  document.getElementById('panel').classList.toggle('show-actions', el.checked);
+}
+
+function switchTab(btn, name) {
+  document.querySelectorAll('.review-panel .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.review-panel .tab-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('tab-' + name);
+  if (pane) pane.classList.add('active');
+}
+
+function speakWord(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = 'en-US';
+  u.rate = 0.9;
+  window.speechSynthesis.speak(u);
+}
+
+async function ignoreWord(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  const rowEl = el.closest('.word-row');
+  const fromLevel = parseInt(rowEl.dataset.level, 10);
+  try {
+    await fetch('/api/mywords/ignore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word })
+    });
+  } catch (e) { return; }
+
+  rowEl.remove();
+  bump('count-' + fromLevel, -1);
+  const srcBody = document.getElementById('body-' + fromLevel);
+  if (srcBody && !srcBody.querySelector('.word-row')) {
+    srcBody.innerHTML = '<div class="empty">这一级暂时没有单词。</div>';
+  }
+  loadIgnored();
+}
+
+async function masterWord(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  const rowEl = el.closest('.word-row');
+  const fromLevel = parseInt(rowEl.dataset.level, 10);
+  try {
+    await fetch('/api/mywords/master', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word })
+    });
+  } catch (e) { return; }
+
+  rowEl.remove();
+  bump('count-' + fromLevel, -1);
+  const srcBody = document.getElementById('body-' + fromLevel);
+  if (srcBody && !srcBody.querySelector('.word-row')) {
+    srcBody.innerHTML = '<div class="empty">这一级暂时没有单词。</div>';
+  }
+  loadMastered();
+}
+
+async function loadIgnored() {
+  const box = document.getElementById('ignored-list');
+  let data;
+  try { data = await api('/api/mywords/ignored'); }
+  catch (e) { box.innerHTML = '<div class="empty">无法加载忽略列表</div>'; return; }
+  if (!data.words.length) {
+    box.innerHTML = '<div class="empty">还没有忽略任何单词。</div>';
+    return;
+  }
+  box.innerHTML = data.words.map(w => ignoredRowHTML(w)).join('');
+}
+
+function ignoredRowHTML(w) {
+  const ph = w.phonetic ? `<span class="ph">[${w.phonetic}]</span>` : '';
+  const cn = (w.translation || '').split('\n')[0].replace(/</g, '&lt;');
+  return `<div class="word-row" data-word="${w.word.toLowerCase()}">
+    <div class="en">${w.word}${ph}</div>
+    <div class="cn" title="${cn}">${cn || '(无释义)'}</div>
+    <button class="restore-btn" title="恢复此词，重新纳入学习" data-w="${encodeURIComponent(w.word)}" onclick="restoreWord(this)">↩ 恢复</button>
+  </div>`;
+}
+
+async function restoreWord(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  try {
+    await fetch('/api/mywords/unignore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word })
+    });
+  } catch (e) { return; }
+  el.closest('.word-row').remove();
+  const box = document.getElementById('ignored-list');
+  if (box && !box.querySelector('.word-row')) {
+    box.innerHTML = '<div class="empty">还没有忽略任何单词。</div>';
+  }
+}
+
+async function loadMastered() {
+  const box = document.getElementById('mastered-list');
+  let data;
+  try { data = await api('/api/mywords/mastered'); }
+  catch (e) { box.innerHTML = '<div class="empty">无法加载已掌握列表</div>'; return; }
+  if (!data.words.length) {
+    box.innerHTML = '<div class="empty">还没有标记任何已掌握的单词。</div>';
+    return;
+  }
+  box.innerHTML = data.words.map(w => masteredRowHTML(w)).join('');
+}
+
+function masteredRowHTML(w) {
+  const ph = w.phonetic ? `<span class="ph">[${w.phonetic}]</span>` : '';
+  const cn = (w.translation || '').split('\n')[0].replace(/</g, '&lt;');
+  return `<div class="word-row" data-word="${w.word.toLowerCase()}">
+    <div class="en">${w.word}${ph}</div>
+    <div class="cn" title="${cn}">${cn || '(无释义)'}</div>
+    <button class="restore-btn" title="恢复此词，重新纳入学习" data-w="${encodeURIComponent(w.word)}" onclick="unmasterWord(this)">↩ 恢复</button>
+  </div>`;
+}
+
+async function unmasterWord(el) {
+  const word = decodeURIComponent(el.dataset.w);
+  try {
+    await fetch('/api/mywords/unmaster', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word })
+    });
+  } catch (e) { return; }
+  el.closest('.word-row').remove();
+  const box = document.getElementById('mastered-list');
+  if (box && !box.querySelector('.word-row')) {
+    box.innerHTML = '<div class="empty">还没有标记任何已掌握的单词。</div>';
+  }
+}
+
+initPanel();
+loadIgnored();
+loadMastered();
+
+</script>
+</body>
+</html>

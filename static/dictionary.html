@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>生成词典 · Glossary</title>
+  <style>
+    :root {
+      --bg:#0f172a; --card:#1e293b; --card2:#334155; --text:#e2e8f0;
+      --muted:#94a3b8; --accent:#38bdf8;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+      font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    }
+    header {
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      border-bottom:1px solid var(--card2); position:sticky; top:0; background:var(--bg); z-index:5;
+    }
+    header a.back { color:var(--muted); text-decoration:none; font-size:22px; }
+    header h1 { font-size:17px; margin:0; font-weight:600; }
+
+    .wrap { max-width:900px; margin:0 auto; padding:20px 18px 80px; }
+    .upload { text-align:center; }
+    .drop {
+      border:2px dashed var(--card2); border-radius:18px; padding:36px 20px;
+      background:var(--card); cursor:pointer; transition:border-color .15s;
+    }
+    .drop:hover { border-color:var(--accent); }
+    .drop .icon { font-size:40px; }
+    .drop p { color:var(--muted); margin:10px 0 0; font-size:14px; }
+    .opts { margin:16px 0; color:var(--muted); font-size:14px; }
+    select { background:var(--card); color:var(--text); border:1px solid var(--card2);
+      border-radius:10px; padding:7px 10px; font-size:14px; }
+    .status { color:var(--muted); font-size:14px; margin-top:12px; min-height:20px; }
+
+    .toolbar { display:none; gap:12px; align-items:center; flex-wrap:wrap; margin:6px 0 14px; }
+    .toolbar input { flex:1; min-width:180px; padding:11px 14px; font-size:15px;
+      background:var(--card); border:1px solid var(--card2); border-radius:10px; color:var(--text); }
+    .toolbar .n { color:var(--muted); font-size:14px; }
+    .toolbar button { background:var(--card); color:var(--text); border:1px solid var(--card2);
+      border-radius:10px; padding:10px 14px; font-size:14px; cursor:pointer; }
+
+    table { border-collapse:collapse; width:100%; display:none; }
+    th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--card2); vertical-align:top; }
+    th { position:sticky; top:57px; background:var(--bg); font-size:13px; color:var(--muted); }
+    td.w { font-weight:700; font-size:17px; white-space:nowrap; }
+    td.p { color:var(--accent); white-space:nowrap; }
+    td.t { font-size:15px; }
+    td.d, td.f { color:var(--muted); white-space:nowrap; font-size:13px; }
+    .fam-dot { width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/">←</a>
+    <h1>生成词典 · Glossary</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="upload" id="upload">
+      <div class="drop" id="drop" onclick="document.getElementById('file').click()">
+        <div class="icon">📕</div>
+        <div>点击上传文章 / 书籍</div>
+        <p>支持 .txt .md .html .pdf .epub</p>
+      </div>
+      <input type="file" id="file" accept=".txt,.md,.markdown,.html,.htm,.pdf,.epub" style="display:none" />
+      <div class="opts">
+        收录范围：
+        <select id="scope">
+          <option value="0">全部单词</option>
+          <option value="2" selected>仅未掌握（≤学习中）</option>
+          <option value="3">未熟悉（≤熟悉）</option>
+        </select>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <input id="q" placeholder="筛选 / filter words…" oninput="filter()" />
+      <span class="n" id="n"></span>
+      <button onclick="download()">⬇ 导出 CSV</button>
+      <button onclick="reset()">↻ 换一篇</button>
+    </div>
+
+    <table id="table">
+      <thead><tr><th>Word</th><th>音标</th><th>释义 Translation</th><th>难度</th><th>COCA</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+<script>
+const FAM_COLOR = {1:'#ef4444',2:'#f59e0b',3:'#eab308',4:'#84cc16',5:'#22c55e'};
+let currentWords = [];
+let currentName = '';
+
+const fileInput = document.getElementById('file');
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) upload(fileInput.files[0]); });
+
+const drop = document.getElementById('drop');
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor='var(--accent)'; }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor=''; }));
+drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
+
+async function upload(file) {
+  const status = document.getElementById('status');
+  status.textContent = '正在生成词典 ' + file.name + ' …';
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('max_familiarity', document.getElementById('scope').value);
+  try {
+    const res = await fetch('/api/dictionary/prepare', { method:'POST', body: fd });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    currentWords = data.words; currentName = data.name;
+    render();
+  } catch (e) {
+    status.textContent = '出错了：' + e.message;
+  }
+}
+
+function render() {
+  document.getElementById('upload').style.display = 'none';
+  document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('table').style.display = 'table';
+  document.getElementById('n').textContent = `${currentWords.length.toLocaleString()} 词 · ${currentName}`;
+  const rows = document.getElementById('rows');
+  rows.innerHTML = currentWords.map(w => {
+    const dot = `<span class="fam-dot" style="background:${FAM_COLOR[w.familiarity]||'#a855f7'}"></span>`;
+    const tr = (w.translation || '').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    const freq = w.coca ? '#' + w.coca : '—';
+    return `<tr>
+      <td class="w">${dot}${w.headword}</td>
+      <td class="p">${w.phonetic || ''}</td>
+      <td class="t">${tr}</td>
+      <td class="d">${w.difficulty_label || '—'}</td>
+      <td class="f">${freq}</td></tr>`;
+  }).join('');
+}
+
+function filter() {
+  const q = document.getElementById('q').value.toLowerCase();
+  document.querySelectorAll('#rows tr').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function download() {
+  const header = ['word','phonetic','translation','difficulty','coca'];
+  const esc = s => '"' + String(s == null ? '' : s).replace(/"/g,'""').replace(/\n/g,' ') + '"';
+  const lines = [header.join(',')];
+  currentWords.forEach(w => lines.push([w.headword, w.phonetic, w.translation, w.difficulty_label, w.coca || ''].map(esc).join(',')));
+  const blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (currentName.replace(/\.[^.]+$/, '') || 'glossary') + '.csv';
+  a.click();
+}
+
+function reset() {
+  document.getElementById('upload').style.display = 'block';
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('table').style.display = 'none';
+  document.getElementById('status').textContent = '';
+  fileInput.value = '';
+}
+</script>
+</body>
+</html>

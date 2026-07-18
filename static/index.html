@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>背单词 · Vocabulary Trainer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card2: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --f1: #ef4444; /* unfamiliar */
+      --f2: #f59e0b; /* learning */
+      --f3: #eab308; /* familiar */
+      --f4: #84cc16; /* proficient */
+      --f5: #22c55e; /* mastered */
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--card2);
+    }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    header .spacer { flex: 1; }
+    select {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--card2);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 15px;
+    }
+    /* familiarity progress bar */
+    .bars { display: flex; gap: 3px; width: 100%; padding: 10px 18px 0; }
+    .bar {
+      height: 8px; border-radius: 4px; transition: flex .4s ease;
+      min-width: 2px;
+    }
+    .legend {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      padding: 8px 18px 4px; font-size: 12px; color: var(--muted);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--card);
+      border-radius: 22px;
+      padding: 34px 26px 26px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+      text-align: center;
+      min-height: 340px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .tag-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .tag {
+      font-size: 12px; padding: 3px 10px; border-radius: 999px;
+      background: var(--card2); color: var(--muted);
+    }
+    .word { font-size: 46px; font-weight: 700; letter-spacing: .5px; word-break: break-word; }
+    .phonetic { color: var(--accent); font-size: 20px; margin-top: 8px; }
+    .speak {
+      margin-top: 14px; display: inline-flex; align-items: center; gap: 6px;
+      background: var(--card2); color: var(--text); border: none;
+      border-radius: 999px; padding: 8px 16px; font-size: 15px; cursor: pointer;
+    }
+    .speak:hover { background: #475569; }
+    .speak:active { transform: scale(.96); }
+    .hint { color: var(--muted); font-size: 14px; margin-top: 26px; }
+    .reveal { margin-top: 22px; }
+    .reveal .translation {
+      font-size: 21px; line-height: 1.6; white-space: pre-line; text-align: left;
+      background: var(--card2); border-radius: 14px; padding: 16px 18px;
+    }
+    .reveal .definition {
+      font-size: 14px; color: var(--muted); margin-top: 12px; white-space: pre-line;
+      text-align: left; max-height: 130px; overflow: auto;
+    }
+    .hidden { display: none; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      padding: 12px 18px 10px;
+      max-width: 640px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    button.answer {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 4px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0b1120;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      align-items: center;
+    }
+    button.answer small { font-weight: 500; opacity: .85; font-size: 11px; }
+    button.answer:active { transform: translateY(1px); }
+    .lvl1 { background: var(--f1); color: #fff; }
+    .lvl2 { background: var(--f2); }
+    .lvl3 { background: var(--f3); }
+    .lvl4 { background: var(--f4); }
+    .lvl5 { background: var(--f5); }
+
+    .explain {
+      max-width: 640px; margin: 0 auto;
+      padding: 4px 18px calc(20px + env(safe-area-inset-bottom));
+      color: var(--muted); font-size: 12px;
+    }
+    .explain h3 { font-size: 13px; color: var(--text); margin: 2px 0 8px; }
+    .explain ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+    .explain li { display: flex; gap: 8px; align-items: flex-start; }
+    .explain li .dot { margin-top: 3px; flex: none; }
+    .explain b { color: var(--text); font-weight: 600; }
+
+    .empty { text-align: center; color: var(--muted); font-size: 18px; padding: 40px; }
+    .toast {
+      position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+      background: #0b1120; border: 1px solid var(--card2); color: var(--text);
+      padding: 8px 16px; border-radius: 999px; font-size: 14px; opacity: 0;
+      transition: opacity .25s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" style="color:var(--muted);text-decoration:none;font-size:22px;">←</a>
+    <h1>背单词</h1>
+    <div class="spacer"></div>
+    <label>
+      <select id="level">
+        <option value="">全部 All</option>
+      </select>
+    </label>
+    <label>
+      <select id="fam"></select>
+    </label>
+  </header>
+
+  <div class="bars" id="bars"></div>
+  <div class="legend" id="legend"></div>
+
+  <main>
+    <div class="card" id="card" onclick="toggleReveal()">
+      <div id="cardContent">
+        <div class="empty">加载中… Loading…</div>
+      </div>
+    </div>
+  </main>
+
+  <div class="controls" id="controls" style="visibility:hidden">
+    <button class="answer lvl1" onclick="setLevel(1, event)">1<small>陌生</small></button>
+    <button class="answer lvl2" onclick="setLevel(2, event)">2<small>学习中</small></button>
+    <button class="answer lvl3" onclick="setLevel(3, event)">3<small>熟悉</small></button>
+    <button class="answer lvl4" onclick="setLevel(4, event)">4<small>熟练</small></button>
+    <button class="answer lvl5" onclick="setLevel(5, event)">5<small>掌握</small></button>
+  </div>
+
+  <div class="explain" id="explain"></div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const FAM_COLORS = { 1: 'var(--f1)', 2: 'var(--f2)', 3: 'var(--f3)', 4: 'var(--f4)', 5: 'var(--f5)' };
+let meta = null;
+let queue = [];
+let current = null;
+let revealed = false;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function currentLevel() { return document.getElementById('level').value; }
+function currentMaxFam() { return document.getElementById('fam').value; }
+
+async function init() {
+  meta = await api('/api/meta');
+  const sel = document.getElementById('level');
+  meta.difficulty_levels.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.id; o.textContent = l.label;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => { loadStats(); loadQueue(true); });
+
+  const fam = document.getElementById('fam');
+  meta.familiarity.forEach(f => {
+    const o = document.createElement('option');
+    o.value = f.level; o.textContent = `≤ ${f.level} ${f.label}`;
+    fam.appendChild(o);
+  });
+  fam.value = '3';
+  fam.addEventListener('change', () => loadQueue(true));
+
+  const legend = document.getElementById('legend');
+  meta.familiarity.forEach(f => {
+    const s = document.createElement('span');
+    s.innerHTML = `<i class="dot" style="background:${FAM_COLORS[f.level]}"></i>${f.label}`;
+    legend.appendChild(s);
+  });
+
+  renderExplain();
+
+  await loadStats();
+  await loadQueue(true);
+}
+
+const FAM_DESC = {
+  1: '完全不认识，没见过 · no idea',
+  2: '见过，需要提示才想起 · need a hint',
+  3: '基本认识，知道意思 · know the meaning',
+  4: '反应很快，用得准 · quick & confident',
+  5: '完全掌握，不需复习 · fully mastered',
+};
+
+function renderExplain() {
+  const el = document.getElementById('explain');
+  const items = meta.familiarity.map(f =>
+    `<li><i class="dot" style="background:${FAM_COLORS[f.level]}"></i>`
+    + `<span><b>${f.level} · ${f.label}</b> — ${FAM_DESC[f.level] || ''}</span></li>`
+  ).join('');
+  el.innerHTML = `<h3>点击 1–5 标记你对这个词的熟悉程度</h3><ul>${items}</ul>`;
+}
+
+async function loadStats() {
+  const level = currentLevel();
+  const s = await api('/api/stats' + (level ? `?level=${level}` : ''));
+  const bars = document.getElementById('bars');
+  bars.innerHTML = '';
+  const total = Math.max(s.total, 1);
+  for (let lvl = 1; lvl <= 5; lvl++) {
+    const c = s.counts[String(lvl)] || 0;
+    const d = document.createElement('div');
+    d.className = 'bar';
+    d.style.background = FAM_COLORS[lvl];
+    d.style.flex = c;
+    d.title = `${meta.familiarity[lvl-1].label}: ${c}`;
+    bars.appendChild(d);
+  }
+  document.title = `背单词 · ${s.total.toLocaleString()} 词`;
+}
+
+async function loadQueue(reset) {
+  const level = currentLevel();
+  const params = new URLSearchParams();
+  if (level) params.set('level', level);
+  params.set('max_familiarity', currentMaxFam() || '3');
+  params.set('limit', '30');
+  const data = await api('/api/study?' + params.toString());
+  queue = data.words;
+  if (reset) showNext();
+}
+
+function showNext() {
+  revealed = false;
+  document.getElementById('controls').style.visibility = 'hidden';
+  if (queue.length === 0) {
+    current = null;
+    document.getElementById('cardContent').innerHTML =
+      '<div class="empty">🎉 本组已学完！<br/>All caught up for this level.</div>';
+    return;
+  }
+  current = queue.shift();
+  renderCard();
+  if (queue.length < 5) loadQueue(false);
+}
+
+function speak(text, ev) {
+  if (ev) ev.stopPropagation();
+  if (!text || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = 0.9;
+  window.speechSynthesis.speak(u);
+}
+
+function renderCard() {
+  const e = current;
+  const tags = [];
+  if (e.difficulty) {
+    const lbl = (meta.difficulty_levels.find(l => l.id === e.difficulty) || {}).label || e.difficulty;
+    tags.push(lbl);
+  }
+  if (e.coca) tags.push('COCA #' + e.coca);
+  if (e.oxford) tags.push('Oxford');
+  if (e.collins) tags.push('★'.repeat(e.collins));
+  tags.push(e.familiarity_label);
+
+  document.getElementById('cardContent').innerHTML = `
+    <div class="tag-row">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+    <div class="word">${e.word}</div>
+    ${e.phonetic ? `<div class="phonetic">[${e.phonetic}]</div>` : ''}
+    <div><button class="speak" onclick="speak(current.word, event)">🔊 发音 · listen</button></div>
+    <div class="reveal hidden" id="reveal">
+      <div class="translation">${e.translation || '(暂无中文释义)'}</div>
+      ${e.definition ? `<div class="definition">${e.definition}</div>` : ''}
+    </div>
+    <div class="hint" id="hint">点击查看释义 · tap to reveal</div>
+  `;
+}
+
+function toggleReveal() {
+  if (!current || revealed) return;
+  revealed = true;
+  const r = document.getElementById('reveal');
+  const h = document.getElementById('hint');
+  if (r) r.classList.remove('hidden');
+  if (h) h.classList.add('hidden');
+  document.getElementById('controls').style.visibility = 'visible';
+}
+
+async function setLevel(level, ev) {
+  if (ev) ev.stopPropagation();
+  if (!current) return;
+  const word = current.word;
+  try {
+    const res = await api('/api/familiarity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word, level })
+    });
+    toast(`${word} → ${res.familiarity_label}`);
+  } catch (e) { /* ignore */ }
+  loadStats();
+  showNext();
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+// keyboard shortcuts (handy when testing on desktop)
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ') { e.preventDefault(); toggleReveal(); }
+  else if ((e.key === 'p' || e.key === 'P') && current) { speak(current.word); }
+  else if (revealed && ['1','2','3','4','5'].includes(e.key)) {
+    setLevel(+e.key);
+  }
+});
+
+init();
+</script>
+</body>
+</html>
