@@ -9,6 +9,10 @@ Data comes from [ECDICT](https://github.com/skywind3000/ECDICT) (English→Chine
 dictionary with phonetics, COCA/BNC frequency ranks and exam-syllabus tags) plus
 the COCA 20,000 frequency list and graded syllabus word lists.
 
+## Main page
+
+![English Vocabulary Trainer main page](screen/main.png)
+
 ## Features
 
 - **🃏 Flashcards (`/cards`)** — Review words and mark how well you know each one

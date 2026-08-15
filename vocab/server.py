@@ -650,7 +650,7 @@ def create_app() -> FastAPI:
     def master_word(req: WordRequest) -> dict:
         """Mark a word as mastered (known well enough to leave the process).
 
-        The word is added to ``data/mastered.json`` and dropped from progress so
+        The word is added to its shard under ``data/mastered/`` and dropped from progress so
         it disappears from the familiarity buckets and is filtered out of every
         future upload, the glossary and the flashcards.
         """
