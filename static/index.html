@@ -38,6 +38,12 @@
     }
     header h1 { font-size: 18px; margin: 0; font-weight: 600; }
     header .spacer { flex: 1; }
+    .shooter-link {
+      color: var(--accent); text-decoration: none; font-size: 14px;
+      font-weight: 600; padding: 8px 12px; border: 1px solid var(--card2);
+      border-radius: 10px; white-space: nowrap;
+    }
+    .shooter-link:hover { border-color: var(--accent); background: var(--card); }
     select {
       background: var(--card);
       color: var(--text);
@@ -163,13 +169,17 @@
     <a href="/" style="color:var(--muted);text-decoration:none;font-size:22px;">←</a>
     <h1>背单词</h1>
     <div class="spacer"></div>
+    <a class="shooter-link" href="/word-shooter">✈️ 单词射手</a>
     <label>
       <select id="level">
         <option value="">全部 All</option>
       </select>
     </label>
-    <label>
-      <select id="fam"></select>
+    <label style="display:inline-flex;align-items:center;gap:6px;">
+      <span style="font-size:13px;color:var(--muted);">熟悉度</span>
+      <select id="famMin"></select>
+      <span style="font-size:13px;color:var(--muted);">～</span>
+      <select id="famMax"></select>
     </label>
   </header>
 
@@ -210,7 +220,23 @@ async function api(path, opts) {
 }
 
 function currentLevel() { return document.getElementById('level').value; }
-function currentMaxFam() { return document.getElementById('fam').value; }
+function currentFamRange() {
+  let mn = parseInt(document.getElementById('famMin').value, 10) || 1;
+  let mx = parseInt(document.getElementById('famMax').value, 10) || mn;
+  if (mn > mx) { const t = mn; mn = mx; mx = t; }
+  return { min: mn, max: mx };
+}
+function syncFamRange(which) {
+  const minEl = document.getElementById('famMin');
+  const maxEl = document.getElementById('famMax');
+  const mn = parseInt(minEl.value, 10);
+  const mx = parseInt(maxEl.value, 10);
+  if (mn > mx) {
+    if (which === 'min') maxEl.value = String(mn);
+    else minEl.value = String(mx);
+  }
+  loadQueue(true);
+}
 
 async function init() {
   meta = await api('/api/meta');
@@ -222,14 +248,20 @@ async function init() {
   });
   sel.addEventListener('change', () => { loadStats(); loadQueue(true); });
 
-  const fam = document.getElementById('fam');
+  const famMin = document.getElementById('famMin');
+  const famMax = document.getElementById('famMax');
   meta.familiarity.forEach(f => {
-    const o = document.createElement('option');
-    o.value = f.level; o.textContent = `≤ ${f.level} ${f.label}`;
-    fam.appendChild(o);
+    const oMin = document.createElement('option');
+    oMin.value = f.level; oMin.textContent = `${f.level} ${f.label}`;
+    famMin.appendChild(oMin);
+    const oMax = document.createElement('option');
+    oMax.value = f.level; oMax.textContent = `${f.level} ${f.label}`;
+    famMax.appendChild(oMax);
   });
-  fam.value = '3';
-  fam.addEventListener('change', () => loadQueue(true));
+  famMin.value = '1';
+  famMax.value = '3';
+  famMin.addEventListener('change', () => syncFamRange('min'));
+  famMax.addEventListener('change', () => syncFamRange('max'));
 
   const legend = document.getElementById('legend');
   meta.familiarity.forEach(f => {
@@ -283,7 +315,9 @@ async function loadQueue(reset) {
   const level = currentLevel();
   const params = new URLSearchParams();
   if (level) params.set('level', level);
-  params.set('max_familiarity', currentMaxFam() || '3');
+  const range = currentFamRange();
+  params.set('max_familiarity', String(range.max));
+  params.set('min_familiarity', String(range.min));
   params.set('limit', '30');
   const data = await api('/api/study?' + params.toString());
   queue = data.words;

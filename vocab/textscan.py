@@ -23,8 +23,10 @@ TEXT_SUFFIXES = {".txt", ".text", ".md", ".markdown"}
 HTML_SUFFIXES = {".html", ".htm", ".xhtml"}
 SUPPORTED_SUFFIXES = TEXT_SUFFIXES | HTML_SUFFIXES | {".pdf", ".epub"}
 
-# A word token: an ASCII letter followed by letters / apostrophes / hyphens.
-WORD_RE = re.compile(r"[A-Za-z][A-Za-z'\-]*")
+# A word token: ASCII letters with optional internal apostrophes. Hyphens are
+# deliberately separators so compounds such as ``state-of-the-art`` share the
+# same entries as their individual words instead of creating duplicate terms.
+WORD_RE = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*")
 
 # ECDICT exchange keys that hold an inflected form of the head word.
 _INFLECTION_KEYS = ("p", "d", "i", "3", "r", "t", "s")
@@ -97,14 +99,14 @@ def iter_text_files(target: Path) -> Iterator[Path]:
 def tokenize(text: str) -> list[str]:
     """Return lower-cased word tokens from ``text``."""
 
-    return [m.group(0).lower().strip("-'") for m in WORD_RE.finditer(text)]
+    return [m.group(0).lower() for m in WORD_RE.finditer(text)]
 
 
 def iter_word_spans(text: str) -> Iterator[tuple[int, int, str]]:
     """Yield ``(start, end, lowercased_word)`` for each word in ``text``."""
 
     for m in WORD_RE.finditer(text):
-        yield m.start(), m.end(), m.group(0).lower().strip("-'")
+        yield m.start(), m.end(), m.group(0).lower()
 
 
 # ------------------------------------------------------------------ lemmatising

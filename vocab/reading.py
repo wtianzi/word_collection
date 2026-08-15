@@ -78,8 +78,9 @@ def build_index(
 
     index: dict[str, WordInfo] = {}
     unknown: set[str] = set()
+    tokens = list(dict.fromkeys(tokenize(text)))
 
-    for token in set(tokenize(text)):
+    for token in tokens:
         if not token:
             continue
         base = resolver.resolve(token)
@@ -112,17 +113,23 @@ def build_index(
                 in_vocab=False,
             )
 
-    return index
+    # ECDICT lookup order is independent of the source text, so restore the
+    # order in which each distinct token first appeared before returning.
+    return {token: index[token] for token in tokens if token in index}
 
 
 def render_reading_body(
-    text: str, index: dict[str, WordInfo], max_familiarity: int
+    text: str,
+    index: dict[str, WordInfo],
+    max_familiarity: int,
+    min_familiarity: int = 1,
 ) -> str:
     """Render ``text`` as HTML: every known word is a clickable ``<span>``.
 
-    Words at or below ``max_familiarity`` are visually highlighted; all known
-    words carry the data attributes needed for the tap-to-translate panel and
-    the click-to-reduce-familiarity action.
+    Words whose familiarity falls within the inclusive
+    ``[min_familiarity, max_familiarity]`` range are visually highlighted; all
+    known words carry the data attributes needed for the tap-to-translate panel
+    and the click-to-reduce-familiarity action.
     """
 
     pieces: list[str] = []
@@ -132,7 +139,9 @@ def render_reading_body(
         raw = text[start:end]
         info = index.get(word)
         if info is not None:
-            highlight = (not info.excluded) and info.familiarity <= max_familiarity
+            highlight = (not info.excluded) and (
+                min_familiarity <= info.familiarity <= max_familiarity
+            )
             style = f"background:{info.color()}" if highlight else ""
             tip = info.translation.split("\n")[0]
             pieces.append(
@@ -156,6 +165,8 @@ def render_reading_body(
 def glossary_entries(
     index: dict[str, WordInfo],
     max_familiarity: int | None = None,
+    *,
+    sort_by_frequency: bool = True,
 ) -> list[WordInfo]:
     """Return de-duplicated word infos sorted by frequency.
 
@@ -171,7 +182,10 @@ def glossary_entries(
             continue
         unique.setdefault(info.headword.lower(), info)
 
+    entries = list(unique.values())
+    if not sort_by_frequency:
+        return entries
     return sorted(
-        unique.values(),
+        entries,
         key=lambda i: (i.coca if i.coca is not None else 10**9, i.headword.lower()),
     )

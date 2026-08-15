@@ -2,8 +2,8 @@
 
 A self-hosted vocabulary trainer built for Chinese speakers learning English.
 Review words with flashcards, read your own books with unknown words highlighted,
-and pre-generate a bilingual glossary for anything you upload. Progress is tracked
-per word on a 1–5 familiarity scale and persisted locally.
+or extract readable text from an online article. Progress is tracked per word on
+a 1–5 familiarity scale and persisted locally.
 
 Data comes from [ECDICT](https://github.com/skywind3000/ECDICT) (English→Chinese
 dictionary with phonetics, COCA/BNC frequency ranks and exam-syllabus tags) plus
@@ -17,6 +17,9 @@ the COCA 20,000 frequency list and graded syllabus word lists.
   known words are highlighted by familiarity. Click any word you don't know to drop it
   to *Unfamiliar*. A **library panel** lists previously uploaded books so you can reopen
   them without re-uploading.
+- **🌐 Read Online** — Paste a public webpage URL on the home page. The app extracts
+  only its readable text and opens it with the same vocabulary highlighting as an
+  uploaded paper, without saving the webpage or creating a material word list.
 - **📕 Glossary (`/dictionary`)** — Pre-generate a vocabulary list (phonetic, Chinese
   translation, difficulty, COCA frequency) for an uploaded book, with filtering and CSV export.
 - **我的单词 · My Words** — The home page groups your tracked words into five levels
@@ -134,6 +137,7 @@ Key JSON endpoints:
 | GET | `/api/uploads` | List previously uploaded books |
 | POST | `/api/reading/prepare` | Upload a book and start reading |
 | POST | `/api/reading/open` | Open an already-uploaded book |
+| POST | `/api/reading/webpage` | Extract and read a public webpage |
 | POST | `/api/dictionary/prepare` | Generate a glossary for a book |
 | GET | `/api/mywords/summary` | Per-level word counts |
 | GET | `/api/mywords?level=N` | Words at a given level |

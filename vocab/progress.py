@@ -143,6 +143,16 @@ class ProgressStore:
             self.save()
         return removed
 
+    def remove_many(self, words: Iterable[str]) -> int:
+        """Delete multiple tracking entries and persist once."""
+
+        keys = {word.lower() for word in words if word}
+        with self._lock:
+            removed = sum(self._data.pop(key, None) is not None for key in keys)
+        if removed:
+            self.save()
+        return removed
+
     def record(self, word: str, response: str) -> Familiarity:
         """Update familiarity from a study ``response`` and persist.
 

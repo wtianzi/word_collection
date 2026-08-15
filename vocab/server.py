@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -21,7 +23,10 @@ from .models import (
 )
 from .progress import ProgressStore
 from .reading import build_index, clean, glossary_entries, render_reading_body
+from .reading_progress import ReadingProgressStore
 from .textscan import SUPPORTED_SUFFIXES, LemmaResolver, extract_text, lookup_ecdict
+from .webpage import WebpageFetchError, fetch_webpage_text
+from .word_shooter import mastery_response
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = PROJECT_ROOT / "static"
@@ -36,6 +41,7 @@ class VocabService:
         self.progress = ProgressStore()
         self.ignore = IgnoreStore()
         self.mastered = MasteredStore()
+        self.reading_progress = ReadingProgressStore()
         self.resolver = LemmaResolver(self.dataset)
         # Pre-sort each difficulty level by frequency (most common first).
         self.by_level: dict[str, list[str]] = {}
@@ -59,8 +65,16 @@ class VocabService:
         return self.all_words
 
     def study_queue(
-        self, level: str | None, max_familiarity: int, limit: int
+        self,
+        level: str | None,
+        max_familiarity: int,
+        limit: int,
+        min_familiarity: int = 1,
     ) -> list[dict]:
+        lo = max(1, min(5, min_familiarity))
+        hi = max(1, min(5, max_familiarity))
+        if lo > hi:
+            lo, hi = hi, lo
         out: list[dict] = []
         for key in self.pool(level):
             # Words parked in the ignore / mastered pools are outside the
@@ -68,7 +82,7 @@ class VocabService:
             if self.ignore.contains(key) or self.mastered.contains(key):
                 continue
             fam = int(self.progress.familiarity(key))
-            if fam <= max_familiarity:
+            if lo <= fam <= hi:
                 out.append(self._entry_payload(key))
                 if len(out) >= limit:
                     break
@@ -112,7 +126,16 @@ class VocabService:
             if p.suffix and p.suffix.lower() not in SUPPORTED_SUFFIXES:
                 continue
             stat = p.stat()
-            items.append({"name": p.name, "size": stat.st_size, "modified": stat.st_mtime})
+            bp = self.reading_progress.get(p.name)
+            items.append(
+                {
+                    "name": p.name,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                    "percent": bp.percent if bp is not None else None,
+                    "scroll": bp.scroll if bp is not None else 0,
+                }
+            )
         items.sort(key=lambda x: x["modified"], reverse=True)
         return items
 
@@ -125,8 +148,102 @@ class VocabService:
             raise HTTPException(status_code=404, detail="file not found")
         return path
 
-    def read_book(self, path: Path, max_familiarity: int) -> dict:
+    def delete_upload(self, name: str) -> dict:
+        """Delete a book, its unread tracked words, and reading position."""
+
+        path = self.resolve_upload(name)
+        stored_name = path.name
+        book_words = self.book_wordlist(path)["words"]
+        unread = {
+            item["headword"]
+            for item in book_words
+            if item.get("familiarity") == int(Familiarity.UNFAMILIAR)
+            and self.progress.get(item["headword"]) is not None
+        }
+        removed_words = self.progress.remove_many(unread)
+        path.unlink()
+        self.reading_progress.remove(stored_name)
+        return {"name": stored_name, "removed_words": removed_words}
+
+    def read_book(
+        self, path: Path, max_familiarity: int, min_familiarity: int = 1
+    ) -> dict:
         """Extract, analyze, register words, and render a reading payload."""
+
+        if path.suffix and path.suffix.lower() not in SUPPORTED_SUFFIXES:
+            raise HTTPException(status_code=400, detail=f"unsupported file type: {path.suffix}")
+        try:
+            text = extract_text(path)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=f"could not read file: {exc}")
+        return self._reading_payload(
+            text, path.name, max_familiarity, min_familiarity=min_familiarity
+        )
+
+    def read_webpage(
+        self, url: str, max_familiarity: int, min_familiarity: int = 1
+    ) -> dict:
+        """Download a public webpage and render its readable text."""
+
+        try:
+            page = fetch_webpage_text(url)
+        except WebpageFetchError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        payload = self._reading_payload(
+            page.text,
+            page.title,
+            max_familiarity,
+            min_familiarity=min_familiarity,
+            register_words=False,
+        )
+        payload["source_url"] = page.url
+        payload["track_progress"] = False
+        return payload
+
+    def _reading_payload(
+        self,
+        text: str,
+        name: str,
+        max_familiarity: int,
+        *,
+        min_familiarity: int = 1,
+        register_words: bool = True,
+    ) -> dict:
+        """Analyze text, register its words, and build a reader response."""
+
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="no readable text found")
+        max_familiarity = max(1, min(5, max_familiarity))
+        min_familiarity = max(1, min(5, min_familiarity))
+        if min_familiarity > max_familiarity:
+            min_familiarity, max_familiarity = max_familiarity, min_familiarity
+        index = self.analyze(text)
+        added = 0
+        if register_words:
+            added = self.progress.register_words(
+                {i.headword for i in index.values() if not i.excluded}
+            )
+        body = render_reading_body(text, index, max_familiarity, min_familiarity)
+        highlighted = sum(
+            1
+            for i in index.values()
+            if not i.excluded and min_familiarity <= i.familiarity <= max_familiarity
+        )
+        return {
+            "name": name,
+            "body": body,
+            "unique_words": len({i.headword.lower() for i in index.values()}),
+            "highlighted": highlighted,
+            "added": added,
+        }
+
+    def book_wordlist(self, path: Path) -> dict:
+        """Analyze an existing book and return its words for a glossary view.
+
+        Unlike :meth:`read_book`, no HTML body is rendered and progress is left
+        untouched: this is a read-only view of the book's vocabulary, grouped by
+        familiarity level on the client.
+        """
 
         if path.suffix and path.suffix.lower() not in SUPPORTED_SUFFIXES:
             raise HTTPException(status_code=400, detail=f"unsupported file type: {path.suffix}")
@@ -136,24 +253,12 @@ class VocabService:
             raise HTTPException(status_code=400, detail=f"could not read file: {exc}")
         if not text.strip():
             raise HTTPException(status_code=400, detail="no readable text found")
-        max_familiarity = max(1, min(5, max_familiarity))
         index = self.analyze(text)
-        added = self.progress.register_words(
-            {i.headword for i in index.values() if not i.excluded}
-        )
-        body = render_reading_body(text, index, max_familiarity)
-        highlighted = sum(
-            1
-            for i in index.values()
-            if not i.excluded and i.familiarity <= max_familiarity
-        )
-        return {
-            "name": path.name,
-            "body": body,
-            "unique_words": len({i.headword.lower() for i in index.values()}),
-            "highlighted": highlighted,
-            "added": added,
-        }
+        words = [
+            w.to_dict()
+            for w in glossary_entries(index, None, sort_by_frequency=False)
+        ]
+        return {"name": path.name, "count": len(words), "words": words}
 
     def analyze(self, text: str):
         index = build_index(text, self.dataset, self.resolver, self.progress)
@@ -192,6 +297,29 @@ class WordRequest(BaseModel):
 class OpenBookRequest(BaseModel):
     name: str
     max_familiarity: int = Field(default=2, ge=1, le=5)
+    min_familiarity: int = Field(default=1, ge=1, le=5)
+
+
+class OnlineReadingRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    max_familiarity: int = Field(default=2, ge=1, le=5)
+    min_familiarity: int = Field(default=1, ge=1, le=5)
+
+
+class ReadingProgressRequest(BaseModel):
+    name: str
+    percent: int = Field(ge=0, le=100)
+    scroll: int = Field(default=0, ge=0)
+
+
+class ShooterWordResult(BaseModel):
+    word: str
+    correct_count: int = Field(ge=0)
+    wrong_count: int = Field(ge=0)
+
+
+class ShooterResultsRequest(BaseModel):
+    words: list[ShooterWordResult] = Field(max_length=100)
 
 
 def create_app() -> FastAPI:
@@ -215,10 +343,20 @@ def create_app() -> FastAPI:
         return service.stats(level)
 
     @app.get("/api/study")
-    def study(level: str | None = None, max_familiarity: int = 3, limit: int = 20) -> dict:
+    def study(
+        level: str | None = None,
+        max_familiarity: int = 3,
+        min_familiarity: int = 1,
+        limit: int = 20,
+    ) -> dict:
         max_familiarity = max(1, min(5, max_familiarity))
+        min_familiarity = max(1, min(5, min_familiarity))
         limit = max(1, min(100, limit))
-        return {"words": service.study_queue(level, max_familiarity, limit)}
+        return {
+            "words": service.study_queue(
+                level, max_familiarity, limit, min_familiarity=min_familiarity
+            )
+        }
 
     @app.get("/api/word/{word}")
     def word(word: str) -> dict:
@@ -242,6 +380,39 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="word not found")
         fam = service.progress.record(key, req.response)
         return {"word": key, "familiarity": int(fam), "familiarity_label": fam.label}
+
+    @app.get("/api/word-shooter/session")
+    def shooter_session(
+        min_familiarity: int = 1,
+        max_familiarity: int = 3,
+        limit: int = 8,
+    ) -> dict:
+        """Return words in a familiarity range with Chinese translations."""
+
+        limit = max(10, min(100, limit))
+        min_familiarity = max(1, min(5, min_familiarity))
+        max_familiarity = max(1, min(5, max_familiarity))
+        candidates = service.study_queue(
+            None, max_familiarity, 5000,
+            min_familiarity=min_familiarity,
+        )
+        words = [item for item in candidates if clean(item.get("translation", ""))]
+        random.Random(time.time_ns()).shuffle(words)
+        return {"words": words[:limit]}
+
+    @app.post("/api/word-shooter/results")
+    def shooter_results(req: ShooterResultsRequest) -> dict:
+        updated = []
+        for item in req.words:
+            key = item.word.lower()
+            if key not in service.dataset:
+                raise HTTPException(status_code=404, detail=f"word not found: {key}")
+            response = mastery_response(item.correct_count, item.wrong_count)
+            if response is None:
+                continue
+            fam = service.progress.record(key, response)
+            updated.append({"word": key, "response": response, "familiarity": int(fam)})
+        return {"updated": updated}
 
     @app.post("/api/familiarity")
     def set_familiarity(req: FamiliarityRequest) -> dict:
@@ -295,19 +466,48 @@ def create_app() -> FastAPI:
     def list_uploads() -> dict:
         return {"files": service.list_uploads()}
 
+    @app.delete("/api/uploads")
+    def delete_upload(name: str) -> dict:
+        result = service.delete_upload(name)
+        return {**result, "deleted": True}
+
     @app.post("/api/reading/prepare")
     async def prepare_reading(
         file: UploadFile = File(...),
         max_familiarity: int = Form(2),
+        min_familiarity: int = Form(1),
     ) -> dict:
         content = await file.read()
         path = service.save_upload(file.filename or "upload.txt", content)
-        return service.read_book(path, max_familiarity)
+        return service.read_book(path, max_familiarity, min_familiarity)
 
     @app.post("/api/reading/open")
     def open_reading(req: OpenBookRequest) -> dict:
         path = service.resolve_upload(req.name)
-        return service.read_book(path, req.max_familiarity)
+        return service.read_book(path, req.max_familiarity, req.min_familiarity)
+
+    @app.post("/api/reading/webpage")
+    def open_webpage(req: OnlineReadingRequest) -> dict:
+        return service.read_webpage(req.url, req.max_familiarity, req.min_familiarity)
+
+    @app.post("/api/reading/wordlist")
+    def reading_wordlist(req: OpenBookRequest) -> dict:
+        path = service.resolve_upload(req.name)
+        return service.book_wordlist(path)
+
+    @app.get("/api/reading/progress")
+    def get_reading_progress(name: str) -> dict:
+        bp = service.reading_progress.get(name)
+        if bp is None:
+            return {"name": name, "percent": None, "scroll": 0}
+        return {"name": name, "percent": bp.percent, "scroll": bp.scroll}
+
+    @app.post("/api/reading/progress")
+    def set_reading_progress(req: ReadingProgressRequest) -> dict:
+        # Only track progress for files that still exist as uploads.
+        service.resolve_upload(req.name)
+        bp = service.reading_progress.set(req.name, req.percent, req.scroll)
+        return {"name": req.name, "percent": bp.percent, "scroll": bp.scroll}
 
     @app.post("/api/dictionary/prepare")
     async def prepare_dictionary(
@@ -516,6 +716,10 @@ def create_app() -> FastAPI:
     @app.get("/cards")
     def cards() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/word-shooter")
+    def word_shooter() -> FileResponse:
+        return FileResponse(STATIC_DIR / "word-shooter.html")
 
     @app.get("/read")
     def read_page() -> FileResponse:

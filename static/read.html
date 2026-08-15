@@ -50,7 +50,12 @@
     .book .info { flex:1; min-width:0; }
     .book .nm { font-size:15px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .book .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .book .prog { font-size:12px; color:var(--accent); border:1px solid var(--card2);
+      border-radius:999px; padding:2px 9px; white-space:nowrap; }
     .book .go { color:var(--accent); font-size:18px; }
+    .book .delete-btn { background:transparent; color:var(--muted); border:1px solid var(--card2);
+      border-radius:8px; padding:5px 8px; cursor:pointer; }
+    .book .delete-btn:hover { color:#fca5a5; border-color:#ef4444; }
     .lib-empty { color:var(--muted); font-size:13px; padding:6px 2px; }
 
     .reader { max-width:760px; margin:0 auto; padding:10px 18px 140px; display:none; }
@@ -67,9 +72,9 @@
     #content .w.done { outline:2px solid #ef4444; outline-offset:1px; }
 
     #panel {
-      position:fixed; left:0; right:0; bottom:0; background:#0b1120;
-      border-top:1px solid var(--card2); padding:14px 18px calc(16px + env(safe-area-inset-bottom));
-      transform:translateY(115%); transition:transform .2s; z-index:20;
+      position:fixed; left:0; right:0; top:0; background:#0b1120;
+      border-bottom:1px solid var(--card2); padding:calc(14px + env(safe-area-inset-top)) 18px 16px;
+      transform:translateY(-115%); transition:transform .2s; z-index:20;
     }
     #panel.show { transform:translateY(0); }
     #panel .panel-head { display:flex; align-items:flex-start; gap:12px; }
@@ -120,6 +125,76 @@
     .toast.show { opacity:1; }
     .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
     .legend i { width:12px; height:12px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:-1px; }
+
+    .book .wl-btn {
+      background:var(--card2); color:var(--text); border:1px solid var(--card2);
+      border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; white-space:nowrap;
+      transition:border-color .15s, color .15s;
+    }
+    .book .wl-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    .wordlist { max-width:760px; margin:0 auto; padding:10px 18px 80px; display:none; }
+    .wl-head { display:flex; align-items:center; gap:12px; padding:6px 0 14px; }
+    .wl-back {
+      background:var(--card); color:var(--text); border:1px solid var(--card2);
+      border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer;
+    }
+    .wl-title { min-width:0; }
+    .wl-title #wlName { font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .wl-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .wl-actions-toggle {
+      margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--muted);
+      font-size:13px; cursor:pointer; user-select:none; white-space:nowrap;
+    }
+    .wl-switch { position:relative; width:40px; height:22px; flex:none; }
+    .wl-switch input { opacity:0; width:0; height:0; }
+    .wl-switch .track {
+      position:absolute; inset:0; background:var(--card2); border-radius:999px;
+      transition:background .15s;
+    }
+    .wl-switch .track::before {
+      content:""; position:absolute; width:16px; height:16px; left:3px; top:3px;
+      background:var(--text); border-radius:50%; transition:transform .15s;
+    }
+    .wl-switch input:checked + .track { background:var(--accent); }
+    .wl-switch input:checked + .track::before { transform:translateX(18px); }
+    .wl-group { margin-top:18px; }
+    .wl-group-head {
+      display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600;
+      margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--card2);
+    }
+    .wl-group-head .dot { width:11px; height:11px; border-radius:3px; display:inline-block; }
+    .wl-group-head .cnt { color:var(--muted); font-weight:400; font-size:13px; }
+    .wl-item {
+      display:flex; align-items:center; gap:10px; padding:8px 2px;
+      border-bottom:1px solid rgba(148,163,184,.12);
+    }
+    .wl-item .wl-w { font-size:16px; font-weight:600; color:var(--text); }
+    .wl-item .wl-ph { color:var(--accent); font-size:13px; }
+    .wl-item .wl-tr { color:var(--muted); font-size:13px; flex:1; min-width:0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .wl-stars { flex:none; font-size:20px; letter-spacing:2px; white-space:nowrap; }
+    .wl-stars .star { cursor:pointer; color:#475569; }
+    .wl-stars .star.on { color:#fbbf24; }
+    .wl-speak, .wl-ignore, .wl-master {
+      flex:none; display:none; background:transparent; border:1px solid var(--card2);
+      color:var(--muted); border-radius:8px; padding:3px 8px; font-size:13px;
+      cursor:pointer; transition:border-color .15s,color .15s;
+    }
+    .wordlist.show-actions .wl-speak { display:inline-block; }
+    .wordlist.show-actions .wl-ignore { display:inline-block; }
+    .wordlist.show-actions .wl-master { display:inline-block; }
+    .wl-speak:hover { border-color:var(--accent); color:var(--accent); }
+    .wl-ignore:hover { border-color:#ef4444; color:#ef4444; }
+    .wl-master:hover { border-color:#22c55e; color:#22c55e; }
+    .wl-empty { color:var(--muted); font-size:13px; padding:20px 2px; }
+    @media (max-width:680px) {
+      .wl-head { flex-wrap:wrap; }
+      .wl-actions-toggle { margin-left:0; }
+      .wl-item { flex-wrap:wrap; }
+      .wl-item .wl-tr { order:2; flex-basis:100%; }
+      .wl-stars { margin-left:auto; }
+    }
   </style>
 </head>
 <body>
@@ -137,11 +212,21 @@
     </div>
     <input type="file" id="file" accept=".txt,.md,.markdown,.html,.htm,.pdf,.epub" style="display:none" />
     <div class="opts">
-      高亮阈值：
-      <select id="maxFam">
-        <option value="1">仅「陌生」</option>
-        <option value="2" selected>「陌生」+「学习中」</option>
-        <option value="3">直到「熟悉」</option>
+      高亮范围：从
+      <select id="minFam" onchange="syncFamRange('min')">
+        <option value="1" selected>陌生</option>
+        <option value="2">学习中</option>
+        <option value="3">熟悉</option>
+        <option value="4">熟练</option>
+        <option value="5">掌握</option>
+      </select>
+      到
+      <select id="maxFam" onchange="syncFamRange('max')">
+        <option value="1">陌生</option>
+        <option value="2" selected>学习中</option>
+        <option value="3">熟悉</option>
+        <option value="4">熟练</option>
+        <option value="5">掌握</option>
       </select>
     </div>
     <div class="status" id="status"></div>
@@ -167,6 +252,24 @@
       </span>
     </div>
     <div id="content"></div>
+  </div>
+
+  <div class="wordlist" id="wordlist">
+    <div class="wl-head">
+      <button class="wl-back" onclick="closeWordList()">← 返回</button>
+      <div class="wl-title">
+        <div id="wlName"></div>
+        <div id="wlCount" class="wl-sub"></div>
+      </div>
+      <label class="wl-actions-toggle" title="显示朗读 / 掌握 / 忽略按钮">
+        <span>更多操作</span>
+        <span class="wl-switch">
+          <input type="checkbox" id="wlActionsSwitch" onchange="toggleWordListActions(this.checked)" />
+          <span class="track"></span>
+        </span>
+      </label>
+    </div>
+    <div id="wlBody"></div>
   </div>
 
   <div id="panel">
@@ -200,7 +303,76 @@ const FAM_LABELS = {1:'陌生 Unfamiliar',2:'学习中 Learning',3:'熟悉 Famil
 const FAM_COLOR = {1:'#ef4444',2:'#f59e0b',3:'#eab308',4:'#84cc16',5:'#22c55e'};
 const UNKNOWN_COLOR = '#a855f7';
 let activeEl = null;
+let readMinFam = 1;
 let readMaxFam = 2;
+let currentBook = null;
+let currentWordList = null;
+
+// Highlight range controls: keep 从(min) <= 到(max) and read the current pair.
+function readFamRange() {
+  let mn = parseInt(document.getElementById('minFam').value, 10) || 1;
+  let mx = parseInt(document.getElementById('maxFam').value, 10) || mn;
+  if (mn > mx) { const t = mn; mn = mx; mx = t; }
+  return { min: mn, max: mx };
+}
+
+function syncFamRange(which) {
+  const minEl = document.getElementById('minFam');
+  const maxEl = document.getElementById('maxFam');
+  const mn = parseInt(minEl.value, 10);
+  const mx = parseInt(maxEl.value, 10);
+  if (mn > mx) {
+    if (which === 'min') maxEl.value = String(mn);
+    else minEl.value = String(mx);
+  }
+}
+
+// --- Reading position memory (stored on the server) ------------------------
+let pendingProgress = null;   // latest {percent, scroll} not yet sent
+let progressFlushTimer = null;
+
+function computeProgress() {
+  const y = Math.round(window.scrollY);
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = scrollable > 0 ? Math.round((y / scrollable) * 100) : 0;
+  return { scroll: y, percent: Math.min(100, Math.max(0, pct)) };
+}
+
+function queueProgressSave() {
+  if (!currentBook) return;
+  pendingProgress = computeProgress();
+  if (progressFlushTimer) return;
+  progressFlushTimer = setTimeout(() => flushProgress(false), 800);
+}
+
+function flushProgress(useBeacon) {
+  if (progressFlushTimer) { clearTimeout(progressFlushTimer); progressFlushTimer = null; }
+  if (!currentBook || !pendingProgress) return;
+  const payload = JSON.stringify({
+    name: currentBook, percent: pendingProgress.percent, scroll: pendingProgress.scroll,
+  });
+  pendingProgress = null;
+  if (useBeacon && navigator.sendBeacon) {
+    navigator.sendBeacon('/api/reading/progress',
+      new Blob([payload], { type: 'application/json' }));
+    return;
+  }
+  fetch('/api/reading/progress', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: payload, keepalive: true,
+  }).catch(() => { /* best-effort */ });
+}
+
+let scrollSaveScheduled = false;
+window.addEventListener('scroll', () => {
+  if (scrollSaveScheduled) return;
+  scrollSaveScheduled = true;
+  requestAnimationFrame(() => { scrollSaveScheduled = false; queueProgressSave(); });
+}, { passive: true });
+window.addEventListener('beforeunload', () => { queueProgressSave(); flushProgress(true); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { queueProgressSave(); flushProgress(true); }
+});
 
 function fmtSize(n) {
   if (n < 1024) return n + ' B';
@@ -227,13 +399,28 @@ async function loadLibrary() {
     files.forEach(f => {
       const el = document.createElement('div');
       el.className = 'book';
+      const pct = (typeof f.percent === 'number') ? f.percent : null;
+      const badge = pct === null
+        ? ''
+        : `<span class="prog">${pct >= 100 ? '已读完' : pct + '%'}</span>`;
       el.innerHTML =
         `<span class="bi">📗</span>` +
         `<div class="info"><div class="nm"></div>` +
         `<div class="sub">${fmtSize(f.size)} · ${fmtDate(f.modified)}</div></div>` +
+        badge +
+        `<button class="wl-btn" title="词表">📋 词表</button>` +
+        `<button class="delete-btn" title="删除书籍">🗑 删除</button>` +
         `<span class="go">→</span>`;
       el.querySelector('.nm').textContent = f.name;
       el.addEventListener('click', () => openBook(f.name));
+      el.querySelector('.wl-btn').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openWordList(f.name);
+      });
+      el.querySelector('.delete-btn').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        deleteBook(f.name, el);
+      });
       list.appendChild(el);
     });
   } catch (e) {
@@ -241,13 +428,34 @@ async function loadLibrary() {
   }
 }
 
+async function deleteBook(name, row) {
+  if (!confirm(`确定删除《${name}》吗？\n书籍文件和阅读进度都会被删除。`)) return;
+  const button = row.querySelector('.delete-btn');
+  button.disabled = true;
+  try {
+    const res = await fetch('/api/uploads?name=' + encodeURIComponent(name), { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+    row.remove();
+    document.getElementById('status').textContent =
+      `已删除 ${name}，并从全局词表移除 ${result.removed_words || 0} 个未学习单词。`;
+    if (!document.querySelector('#libList .book')) {
+      document.getElementById('libList').innerHTML = '<div class="lib-empty">还没有上传过书籍。</div>';
+    }
+  } catch (e) {
+    button.disabled = false;
+    document.getElementById('status').textContent = '删除失败：' + e.message;
+  }
+}
+
 async function openBook(name) {
   const status = document.getElementById('status');
   status.textContent = '正在打开 ' + name + ' …';
   try {
+    const range = readFamRange();
     const res = await fetch('/api/reading/open', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, max_familiarity: parseInt(document.getElementById('maxFam').value, 10) })
+      body: JSON.stringify({ name, max_familiarity: range.max, min_familiarity: range.min })
     });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
     showReader(await res.json());
@@ -255,6 +463,196 @@ async function openBook(name) {
   } catch (e) {
     status.textContent = '出错了：' + e.message;
   }
+}
+
+async function openWebPage(url) {
+  const status = document.getElementById('status');
+  status.textContent = '正在提取网页正文…';
+  try {
+    const range = readFamRange();
+    const res = await fetch('/api/reading/webpage', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        url,
+        max_familiarity: range.max,
+        min_familiarity: range.min,
+      })
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    showReader(await res.json());
+    status.textContent = '';
+    history.replaceState(null, '', '/read');
+  } catch (e) {
+    status.textContent = '网页读取失败：' + e.message;
+  }
+}
+
+const FAM_ORDER = [1, 2, 3, 4, 5];
+
+async function openWordList(name) {
+  const status = document.getElementById('status');
+  status.textContent = '正在生成 ' + name + ' 的词表 …';
+  try {
+    const res = await fetch('/api/reading/wordlist', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    renderWordList(await res.json());
+    status.textContent = '';
+  } catch (e) {
+    status.textContent = '出错了：' + e.message;
+  }
+}
+
+function renderWordList(data) {
+  document.getElementById('upload').style.display = 'none';
+  document.getElementById('reader').style.display = 'none';
+  document.getElementById('wordlist').style.display = 'block';
+  currentBook = null;  // viewing a glossary, not reading: don't record scroll
+  currentWordList = {
+    name: data.name,
+    words: (data.words || []).map(word => ({ ...word })),
+  };
+  renderWordListBody();
+  window.scrollTo(0, 0);
+}
+
+function renderWordListBody() {
+  if (!currentWordList) return;
+  const wordsInList = currentWordList.words;
+  document.getElementById('wlName').textContent = currentWordList.name;
+  document.getElementById('wlCount').textContent =
+    `共 ${wordsInList.length.toLocaleString()} 个单词 · 按熟悉度分组`;
+
+  const groups = {1:[],2:[],3:[],4:[],5:[]};
+  wordsInList.forEach(w => {
+    const fam = FAM_ORDER.includes(w.familiarity) ? w.familiarity : 1;
+    groups[fam].push(w);
+  });
+
+  const body = document.getElementById('wlBody');
+  body.innerHTML = '';
+  let any = false;
+  FAM_ORDER.forEach(fam => {
+    const words = groups[fam];
+    if (!words.length) return;
+    any = true;
+    const group = document.createElement('div');
+    group.className = 'wl-group';
+    const head = document.createElement('div');
+    head.className = 'wl-group-head';
+    head.innerHTML =
+      `<span class="dot" style="background:${FAM_COLOR[fam]}"></span>` +
+      `<span>${FAM_LABELS[fam]}</span>` +
+      `<span class="cnt">· ${words.length}</span>`;
+    group.appendChild(head);
+    words.forEach(w => {
+      const item = document.createElement('div');
+      item.className = 'wl-item';
+
+      const word = document.createElement('span');
+      word.className = 'wl-w';
+      word.textContent = w.headword;
+      item.appendChild(word);
+
+      if (w.phonetic) {
+        const phonetic = document.createElement('span');
+        phonetic.className = 'wl-ph';
+        phonetic.textContent = `[${w.phonetic}]`;
+        item.appendChild(phonetic);
+      }
+
+      const translation = document.createElement('span');
+      translation.className = 'wl-tr';
+      translation.textContent = (w.translation || '').split('\n')[0] || '(无释义)';
+      translation.title = translation.textContent;
+      item.appendChild(translation);
+
+      const speak = document.createElement('button');
+      speak.className = 'wl-speak';
+      speak.type = 'button';
+      speak.title = '朗读单词';
+      speak.textContent = '🔊';
+      speak.addEventListener('click', () => speakWord(w.headword));
+      item.appendChild(speak);
+
+      const stars = document.createElement('span');
+      stars.className = 'wl-stars';
+      [1,2,3,4,5].forEach(level => {
+        const star = document.createElement('span');
+        star.className = 'star' + (level <= fam ? ' on' : '');
+        star.textContent = '★';
+        star.title = `设置熟悉度为 ${level}`;
+        star.addEventListener('click', () => setWordListStar(w.headword, level));
+        stars.appendChild(star);
+      });
+      item.appendChild(stars);
+
+      const master = document.createElement('button');
+      master.className = 'wl-master';
+      master.type = 'button';
+      master.title = '标记为已掌握（移出学习流程）';
+      master.textContent = '✓ 掌握';
+      master.addEventListener('click', () => parkWordList(
+        w.headword, '/api/mywords/master', '已掌握'
+      ));
+      item.appendChild(master);
+
+      const ignore = document.createElement('button');
+      ignore.className = 'wl-ignore';
+      ignore.type = 'button';
+      ignore.title = '忽略此词（人名 / 专有名词）';
+      ignore.textContent = '🚫 忽略';
+      ignore.addEventListener('click', () => parkWordList(
+        w.headword, '/api/mywords/ignore', '已忽略'
+      ));
+      item.appendChild(ignore);
+      group.appendChild(item);
+    });
+    body.appendChild(group);
+  });
+  if (!any) body.innerHTML = '<div class="wl-empty">这篇文章里没有可显示的单词。</div>';
+}
+
+function toggleWordListActions(checked) {
+  document.getElementById('wordlist').classList.toggle('show-actions', checked);
+}
+
+async function setWordListStar(word, level) {
+  if (!currentWordList) return;
+  const entry = currentWordList.words.find(
+    w => w.headword.toLowerCase() === word.toLowerCase()
+  );
+  if (!entry || entry.familiarity === level) return;
+  try {
+    const data = await postJSON('/api/familiarity', { word, level });
+    entry.familiarity = data.familiarity;
+    renderWordListBody();
+    toast(`${word} → ${data.familiarity_label}`);
+  } catch (e) { toast('保存失败'); }
+}
+
+async function parkWordList(word, url, tag) {
+  if (!currentWordList) return;
+  try {
+    await postJSON(url, { word });
+    currentWordList.words = currentWordList.words.filter(
+      w => w.headword.toLowerCase() !== word.toLowerCase()
+    );
+    renderWordListBody();
+    toast(`${word} · ${tag}`);
+  } catch (e) { toast('保存失败'); }
+}
+
+function closeWordList() {
+  panel.classList.remove('show');
+  document.getElementById('wordlist').style.display = 'none';
+  document.getElementById('wordlist').classList.remove('show-actions');
+  document.getElementById('wlActionsSwitch').checked = false;
+  document.getElementById('upload').style.display = 'block';
+  currentWordList = null;
+  window.scrollTo(0, 0);
 }
 
 const fileInput = document.getElementById('file');
@@ -270,7 +668,9 @@ async function upload(file) {
   status.textContent = '正在分析 ' + file.name + ' …';
   const fd = new FormData();
   fd.append('file', file);
-  fd.append('max_familiarity', document.getElementById('maxFam').value);
+  const range = readFamRange();
+  fd.append('max_familiarity', String(range.max));
+  fd.append('min_familiarity', String(range.min));
   try {
     const res = await fetch('/api/reading/prepare', { method:'POST', body: fd });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
@@ -285,14 +685,38 @@ async function upload(file) {
 function showReader(data) {
   document.getElementById('upload').style.display = 'none';
   document.getElementById('reader').style.display = 'block';
-  readMaxFam = parseInt(document.getElementById('maxFam').value, 10) || 2;
+  const range = readFamRange();
+  readMinFam = range.min;
+  readMaxFam = range.max;
   document.getElementById('fileName').textContent = data.name;
   document.getElementById('counts').textContent =
     `共 ${data.unique_words.toLocaleString()} 个不同单词 · ${data.highlighted.toLocaleString()} 个高亮生词`
     + (data.added ? ` · 新增 ${data.added.toLocaleString()} 个到「我的单词」` : '');
   document.getElementById('content').innerHTML = data.body;
   bindWords();
-  window.scrollTo(0, 0);
+  currentBook = data.track_progress === false ? null : data.name;
+  if (currentBook) {
+    restoreReadingPosition(data.name, data.scroll);
+  } else {
+    window.scrollTo(0, 0);
+  }
+}
+
+// Jump back to the last-read spot. Uses the scroll offset from the open/library
+// response when available, otherwise asks the server for it.
+async function restoreReadingPosition(name, knownScroll) {
+  let savedY = parseInt(knownScroll, 10);
+  if (!Number.isFinite(savedY)) {
+    savedY = 0;
+    try {
+      const res = await fetch('/api/reading/progress?name=' + encodeURIComponent(name));
+      if (res.ok) savedY = parseInt((await res.json()).scroll, 10) || 0;
+    } catch (e) { savedY = 0; }
+  }
+  if (currentBook !== name) return;  // user moved on while we were fetching
+  window.scrollTo(0, savedY);
+  // Layout may still be settling (fonts, images); reapply once more.
+  requestAnimationFrame(() => { if (currentBook === name) window.scrollTo(0, savedY); });
 }
 
 function bindWords() {
@@ -334,7 +758,7 @@ function applyWordState(word, fam, excluded) {
     el.dataset.fam = String(fam);
     el.dataset.excluded = excluded ? '1' : '0';
     const inVocab = el.dataset.vocab === '1';
-    const highlight = !excluded && fam <= readMaxFam;
+    const highlight = !excluded && fam >= readMinFam && fam <= readMaxFam;
     el.classList.toggle('hl', highlight);
     el.style.background = highlight
       ? (inVocab ? (FAM_COLOR[fam] || FAM_COLOR[1]) : UNKNOWN_COLOR)
@@ -351,14 +775,17 @@ async function postJSON(url, body) {
   return res.json();
 }
 
-function speakActive() {
-  const word = activeEl && activeEl.dataset.hw;
+function speakWord(word) {
   if (!word || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(word);
   u.lang = 'en-US';
   u.rate = 0.9;
   window.speechSynthesis.speak(u);
+}
+
+function speakActive() {
+  speakWord(activeEl && activeEl.dataset.hw);
 }
 
 async function copyText(text) {
@@ -437,10 +864,14 @@ document.addEventListener('click', e => {
 });
 
 function reset() {
+  queueProgressSave();
+  flushProgress(false);  // persist the current spot before leaving the reader
   document.getElementById('reader').style.display = 'none';
   document.getElementById('upload').style.display = 'block';
   document.getElementById('status').textContent = '';
   fileInput.value = '';
+  currentBook = null;
+  loadLibrary();  // refresh the percentage badges with the just-saved progress
 }
 
 let toastTimer = null;
@@ -452,6 +883,8 @@ function toast(msg) {
 }
 
 loadLibrary();
+const requestedWebPage = new URLSearchParams(window.location.search).get('url');
+if (requestedWebPage) openWebPage(requestedWebPage);
 </script>
 </body>
 </html>

@@ -1,0 +1,24 @@
+{
+  "books": {
+    "The thirty nine steps.txt.txt": {
+      "percent": 0,
+      "scroll": 127,
+      "updated": "2026-08-08T13:27:44+00:00"
+    },
+    "Full text of Charlottes Web.txt": {
+      "percent": 15,
+      "scroll": 33600,
+      "updated": "2026-08-09T18:18:29+00:00"
+    },
+    "OHenry.txt": {
+      "percent": 21,
+      "scroll": 49609,
+      "updated": "2026-08-11T22:43:11+00:00"
+    },
+    "Clown - LotM Vol. 1_djvu.txt": {
+      "percent": 1,
+      "scroll": 41279,
+      "updated": "2026-08-15T13:08:33+00:00"
+    }
+  }
+}
