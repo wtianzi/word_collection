@@ -22,7 +22,7 @@ from .models import (
     WordEntry,
 )
 from .progress import ProgressStore
-from .reading import build_index, clean, glossary_entries, render_reading_body
+from .reading import build_index, clean, glossary_entries, paginate_text, render_reading_body
 from .reading_progress import ReadingProgressStore
 from .textscan import SUPPORTED_SUFFIXES, LemmaResolver, extract_text, lookup_ecdict
 from .webpage import WebpageFetchError, fetch_webpage_text
@@ -58,6 +58,12 @@ class VocabService:
     def _freq_key(self, key: str) -> tuple[int, str]:
         rank = self.dataset[key].frequency_rank
         return (rank if rank is not None else 10**9, key)
+
+    def canonical_word(self, word: str) -> str:
+        """Return the learning-record key for a surface word."""
+
+        key = word.strip().lower()
+        return self.resolver.resolve(key) or key
 
     def pool(self, level: str | None) -> list[str]:
         if level and level in self.by_level:
@@ -114,22 +120,35 @@ class VocabService:
         path.write_bytes(content)
         return path
 
+    @staticmethod
+    def _safe_part(value: str, label: str) -> str:
+        part = (value or "").strip()
+        if not part or part in {".", ".."} or Path(part).name != part:
+            raise HTTPException(status_code=400, detail=f"invalid {label}")
+        return part
+
+    def upload_id(self, path: Path) -> str:
+        return path.relative_to(UPLOAD_DIR).as_posix()
+
     def list_uploads(self) -> list[dict]:
         """Return previously uploaded, readable files, newest first."""
 
         if not UPLOAD_DIR.exists():
             return []
         items = []
-        for p in UPLOAD_DIR.iterdir():
+        for p in UPLOAD_DIR.rglob("*"):
             if not p.is_file():
                 continue
             if p.suffix and p.suffix.lower() not in SUPPORTED_SUFFIXES:
                 continue
             stat = p.stat()
-            bp = self.reading_progress.get(p.name)
+            identifier = self.upload_id(p)
+            bp = self.reading_progress.get(identifier)
             items.append(
                 {
                     "name": p.name,
+                    "path": identifier,
+                    "folder": p.parent.relative_to(UPLOAD_DIR).as_posix() if p.parent != UPLOAD_DIR else None,
                     "size": stat.st_size,
                     "modified": stat.st_mtime,
                     "percent": bp.percent if bp is not None else None,
@@ -139,12 +158,78 @@ class VocabService:
         items.sort(key=lambda x: x["modified"], reverse=True)
         return items
 
+    def list_folders(self) -> list[str]:
+        if not UPLOAD_DIR.exists():
+            return []
+        return sorted(
+            p.relative_to(UPLOAD_DIR).as_posix()
+            for p in UPLOAD_DIR.iterdir() if p.is_dir()
+        )
+
+    def create_folder(self, name: str) -> str:
+        folder = self._safe_part(name, "folder name")
+        path = UPLOAD_DIR / folder
+        try:
+            path.mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise HTTPException(status_code=409, detail="folder already exists") from exc
+        return folder
+
+    def rename_folder(self, name: str, new_name: str) -> str:
+        old = self._safe_part(name, "folder name")
+        new = self._safe_part(new_name, "folder name")
+        source, target = UPLOAD_DIR / old, UPLOAD_DIR / new
+        if not source.is_dir():
+            raise HTTPException(status_code=404, detail="folder not found")
+        if target.exists():
+            raise HTTPException(status_code=409, detail="folder already exists")
+        source.rename(target)
+        self.reading_progress.rename_prefix(old, new)
+        return new
+
+    def delete_folder(self, name: str) -> str:
+        folder = self._safe_part(name, "folder name")
+        path = UPLOAD_DIR / folder
+        if not path.is_dir():
+            raise HTTPException(status_code=404, detail="folder not found")
+        try:
+            path.rmdir()
+        except OSError as exc:
+            raise HTTPException(status_code=409, detail="folder is not empty") from exc
+        return folder
+
+    def move_upload(self, name: str, folder: str | None) -> str:
+        source = self.resolve_upload(name)
+        target_dir = UPLOAD_DIR
+        if folder:
+            folder_name = self._safe_part(folder, "folder name")
+            target_dir = UPLOAD_DIR / folder_name
+            if not target_dir.is_dir():
+                raise HTTPException(status_code=404, detail="folder not found")
+        target = target_dir / source.name
+        if target == source:
+            return self.upload_id(source)
+        if target.exists():
+            raise HTTPException(status_code=409, detail="a file with this name already exists there")
+        old_id = self.upload_id(source)
+        source.rename(target)
+        new_id = self.upload_id(target)
+        self.reading_progress.rename(old_id, new_id)
+        return new_id
+
     def resolve_upload(self, name: str) -> Path:
         """Safely resolve an existing upload by name."""
 
-        safe = Path(name or "").name
-        path = UPLOAD_DIR / safe
-        if not safe or not path.is_file():
+        raw = (name or "").strip().replace("\\", "/")
+        relative = Path(raw)
+        if not raw or relative.is_absolute() or ".." in relative.parts:
+            raise HTTPException(status_code=400, detail="invalid file path")
+        path = UPLOAD_DIR / relative
+        try:
+            path.resolve().relative_to(UPLOAD_DIR.resolve())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid file path") from exc
+        if not path.is_file():
             raise HTTPException(status_code=404, detail="file not found")
         return path
 
@@ -152,7 +237,7 @@ class VocabService:
         """Delete a book, its unread tracked words, and reading position."""
 
         path = self.resolve_upload(name)
-        stored_name = path.name
+        stored_name = self.upload_id(path)
         book_words = self.book_wordlist(path)["words"]
         unread = {
             item["headword"]
@@ -166,7 +251,8 @@ class VocabService:
         return {"name": stored_name, "removed_words": removed_words}
 
     def read_book(
-        self, path: Path, max_familiarity: int, min_familiarity: int = 1
+        self, path: Path, max_familiarity: int, min_familiarity: int = 1,
+        page: int | None = None,
     ) -> dict:
         """Extract, analyze, register words, and render a reading payload."""
 
@@ -176,9 +262,20 @@ class VocabService:
             text = extract_text(path)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=400, detail=f"could not read file: {exc}")
-        return self._reading_payload(
-            text, path.name, max_familiarity, min_familiarity=min_familiarity
+        pages = paginate_text(text)
+        book_id = self.upload_id(path)
+        saved = self.reading_progress.get(book_id)
+        selected = saved.page if page is None and saved is not None else (page or 0)
+        selected = max(0, min(len(pages) - 1, selected))
+        payload = self._reading_payload(
+            pages[selected], book_id, max_familiarity, min_familiarity=min_familiarity
         )
+        payload.update({
+            "page": selected,
+            "total_pages": len(pages),
+            "scroll": saved.scroll if saved is not None and saved.page == selected else 0,
+        })
+        return payload
 
     def read_webpage(
         self, url: str, max_familiarity: int, min_familiarity: int = 1
@@ -298,6 +395,7 @@ class OpenBookRequest(BaseModel):
     name: str
     max_familiarity: int = Field(default=2, ge=1, le=5)
     min_familiarity: int = Field(default=1, ge=1, le=5)
+    page: int | None = Field(default=None, ge=0)
 
 
 class OnlineReadingRequest(BaseModel):
@@ -310,6 +408,21 @@ class ReadingProgressRequest(BaseModel):
     name: str
     percent: int = Field(ge=0, le=100)
     scroll: int = Field(default=0, ge=0)
+    page: int = Field(default=0, ge=0)
+
+
+class FolderRequest(BaseModel):
+    name: str
+
+
+class RenameFolderRequest(BaseModel):
+    name: str
+    new_name: str
+
+
+class MoveUploadRequest(BaseModel):
+    name: str
+    folder: str | None = None
 
 
 class ShooterWordResult(BaseModel):
@@ -360,7 +473,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/word/{word}")
     def word(word: str) -> dict:
-        key = word.lower()
+        key = service.canonical_word(word)
         if key not in service.dataset:
             raise HTTPException(status_code=404, detail="word not found")
         return service._entry_payload(key)
@@ -375,7 +488,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/review")
     def review(req: ReviewRequest) -> dict:
-        key = req.word.lower()
+        key = service.canonical_word(req.word)
         if key not in service.dataset:
             raise HTTPException(status_code=404, detail="word not found")
         fam = service.progress.record(key, req.response)
@@ -404,7 +517,7 @@ def create_app() -> FastAPI:
     def shooter_results(req: ShooterResultsRequest) -> dict:
         updated = []
         for item in req.words:
-            key = item.word.lower()
+            key = service.canonical_word(item.word)
             if key not in service.dataset:
                 raise HTTPException(status_code=404, detail=f"word not found: {key}")
             response = mastery_response(item.correct_count, item.wrong_count)
@@ -423,7 +536,7 @@ def create_app() -> FastAPI:
         flashcard and *my words* callers, which only grade tracked words).
         """
 
-        key = req.word.lower()
+        key = service.canonical_word(req.word)
         service.ignore.remove(key)
         service.mastered.remove(key)
         fam = service.progress.set_familiarity(key, req.level)
@@ -438,7 +551,7 @@ def create_app() -> FastAPI:
         mastered.
         """
 
-        key = req.word.lower()
+        key = service.canonical_word(req.word)
         service.ignore.remove(key)
         service.mastered.remove(key)
         current = int(service.progress.familiarity(key))
@@ -455,7 +568,7 @@ def create_app() -> FastAPI:
         removed from there so it behaves like every other tracked word again.
         """
 
-        key = req.word.lower()
+        key = service.canonical_word(req.word)
         service.ignore.remove(key)
         service.mastered.remove(key)
         fam = service.progress.set_familiarity(key, int(Familiarity.UNFAMILIAR))
@@ -464,7 +577,23 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------ uploads
     @app.get("/api/uploads")
     def list_uploads() -> dict:
-        return {"files": service.list_uploads()}
+        return {"files": service.list_uploads(), "folders": service.list_folders()}
+
+    @app.post("/api/folders")
+    def create_folder(req: FolderRequest) -> dict:
+        return {"name": service.create_folder(req.name), "created": True}
+
+    @app.patch("/api/folders")
+    def rename_folder(req: RenameFolderRequest) -> dict:
+        return {"name": service.rename_folder(req.name, req.new_name), "renamed": True}
+
+    @app.delete("/api/folders")
+    def delete_folder(name: str) -> dict:
+        return {"name": service.delete_folder(name), "deleted": True}
+
+    @app.post("/api/uploads/move")
+    def move_upload(req: MoveUploadRequest) -> dict:
+        return {"path": service.move_upload(req.name, req.folder), "moved": True}
 
     @app.delete("/api/uploads")
     def delete_upload(name: str) -> dict:
@@ -484,7 +613,7 @@ def create_app() -> FastAPI:
     @app.post("/api/reading/open")
     def open_reading(req: OpenBookRequest) -> dict:
         path = service.resolve_upload(req.name)
-        return service.read_book(path, req.max_familiarity, req.min_familiarity)
+        return service.read_book(path, req.max_familiarity, req.min_familiarity, req.page)
 
     @app.post("/api/reading/webpage")
     def open_webpage(req: OnlineReadingRequest) -> dict:
@@ -499,15 +628,15 @@ def create_app() -> FastAPI:
     def get_reading_progress(name: str) -> dict:
         bp = service.reading_progress.get(name)
         if bp is None:
-            return {"name": name, "percent": None, "scroll": 0}
-        return {"name": name, "percent": bp.percent, "scroll": bp.scroll}
+            return {"name": name, "percent": None, "scroll": 0, "page": 0}
+        return {"name": name, "percent": bp.percent, "scroll": bp.scroll, "page": bp.page}
 
     @app.post("/api/reading/progress")
     def set_reading_progress(req: ReadingProgressRequest) -> dict:
         # Only track progress for files that still exist as uploads.
         service.resolve_upload(req.name)
-        bp = service.reading_progress.set(req.name, req.percent, req.scroll)
-        return {"name": req.name, "percent": bp.percent, "scroll": bp.scroll}
+        bp = service.reading_progress.set(req.name, req.percent, req.scroll, req.page)
+        return {"name": req.name, "percent": bp.percent, "scroll": bp.scroll, "page": bp.page}
 
     @app.post("/api/dictionary/prepare")
     async def prepare_dictionary(
@@ -600,7 +729,7 @@ def create_app() -> FastAPI:
         future upload.
         """
 
-        key = req.word.strip().lower()
+        key = service.canonical_word(req.word)
         if not key:
             raise HTTPException(status_code=400, detail="empty word")
         service.ignore.add(key)
@@ -611,7 +740,7 @@ def create_app() -> FastAPI:
     def unignore_word(req: WordRequest) -> dict:
         """Remove a word from the ignore list so it is tracked again."""
 
-        key = req.word.strip().lower()
+        key = service.canonical_word(req.word)
         removed = service.ignore.remove(key)
         return {"word": key, "ignored": False, "removed": removed}
 
@@ -655,7 +784,7 @@ def create_app() -> FastAPI:
         future upload, the glossary and the flashcards.
         """
 
-        key = req.word.strip().lower()
+        key = service.canonical_word(req.word)
         if not key:
             raise HTTPException(status_code=400, detail="empty word")
         service.mastered.add(key)
@@ -666,7 +795,7 @@ def create_app() -> FastAPI:
     def unmaster_word(req: WordRequest) -> dict:
         """Remove a word from the mastered list so it is tracked again."""
 
-        key = req.word.strip().lower()
+        key = service.canonical_word(req.word)
         removed = service.mastered.remove(key)
         return {"word": key, "mastered": False, "removed": removed}
 

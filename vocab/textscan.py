@@ -1,6 +1,6 @@
 """Shared helpers for scanning reading material (papers / books).
 
-Supports plain text, Markdown, HTML, PDF and EPUB.  Provides tokenisation and a
+Supports plain text, subtitle files, Markdown, HTML, PDF and EPUB.  Provides tokenisation and a
 lemmatiser built from the ECDICT inflection data so that words such as
 ``running`` / ``studies`` / ``abandoned`` are mapped back to the base word that
 appears in our vocabulary.
@@ -19,7 +19,11 @@ from .models import WordEntry
 
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
-TEXT_SUFFIXES = {".txt", ".text", ".md", ".markdown"}
+SUBTITLE_SUFFIXES = {
+    ".srt", ".vtt", ".ass", ".ssa", ".sub", ".sbv", ".lrc", ".smi",
+    ".ttml", ".dfxp",
+}
+TEXT_SUFFIXES = {".txt", ".text", ".md", ".markdown"} | SUBTITLE_SUFFIXES
 HTML_SUFFIXES = {".html", ".htm", ".xhtml"}
 SUPPORTED_SUFFIXES = TEXT_SUFFIXES | HTML_SUFFIXES | {".pdf", ".epub"}
 
@@ -120,24 +124,38 @@ class LemmaResolver:
     def __init__(self, dataset: dict[str, WordEntry]) -> None:
         self._dataset = dataset
         self._inflections: dict[str, str] = {}
+        # An ECDICT row for an inflected headword can itself be present in the
+        # graded dataset (for example ``running`` or ``better``).  Record its
+        # explicit lemma first so an exact dataset match cannot hide that
+        # relationship.
         for key, entry in dataset.items():
-            # "0" in exchange is this word's own lemma, if it is an inflection.
-            lemma = entry.exchange.get("0")
-            if lemma:
-                self._inflections.setdefault(lemma.lower(), key)
+            lemma = entry.exchange.get("0", "").lower()
+            if lemma and lemma != key and lemma in dataset:
+                self._inflections[key] = lemma
+
+        for key, entry in dataset.items():
+            lemma = self._inflections.get(key, key)
             for infl_key in _INFLECTION_KEYS:
                 form = entry.exchange.get(infl_key)
                 if form:
-                    self._inflections.setdefault(form.lower(), key)
+                    self._inflections.setdefault(form.lower(), lemma)
 
     def resolve(self, token: str) -> str | None:
         """Return the vocabulary head word for ``token`` or ``None``."""
 
         token = token.lower()
+        if token in self._inflections:
+            # Some ECDICT entries form a short chain (surface -> derived
+            # headword -> base headword).  Follow it to a fixed point so the
+            # canonical key is stable across repeated migrations.
+            seen = {token}
+            lemma = self._inflections[token]
+            while lemma in self._inflections and lemma not in seen:
+                seen.add(lemma)
+                lemma = self._inflections[lemma]
+            return lemma
         if token in self._dataset:
             return token
-        if token in self._inflections:
-            return self._inflections[token]
         # Simple morphological fall-backs for regular forms.
         for base in _naive_bases(token):
             if base in self._dataset:

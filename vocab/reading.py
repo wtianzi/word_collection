@@ -8,6 +8,7 @@ HTML body where every word is clickable.
 from __future__ import annotations
 
 import html
+import re
 from dataclasses import dataclass
 
 from .models import GRADED_LEVEL_LABELS, Familiarity, WordEntry
@@ -17,6 +18,57 @@ from .textscan import LemmaResolver, iter_word_spans, lookup_ecdict, tokenize
 # Familiarity colours, matching the flashcard UI.
 FAM_COLOR = {1: "#ef4444", 2: "#f59e0b", 3: "#eab308", 4: "#84cc16", 5: "#22c55e"}
 UNKNOWN_COLOR = "#a855f7"  # word outside the graded vocabulary
+READING_PAGE_SIZE = 100 * 1024
+
+# A chapter heading must occupy its own line and include an ordinal.  Requiring
+# the ordinal keeps prose such as "Chapter from the report" from becoming an
+# accidental page boundary.
+_CHAPTER_HEADING_RE = re.compile(
+    r"(?im)^[ \t]*(?:"
+    r"chapter[ \t]+(?:\d+[a-z]?|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten)\b"
+    r"|第[ \t]*[0-9〇零一二三四五六七八九十百千万两]+[ \t]*[章节回]"
+    r").*$"
+)
+
+
+def paginate_text(text: str, page_size: int = READING_PAGE_SIZE) -> list[str]:
+    """Split a book one chapter per page, falling back to character pages.
+
+    Chapter-based pagination is used whenever a conventional English or Chinese
+    chapter heading is present.  Any front matter is kept with the first
+    chapter.  For documents without chapter headings, prefer a nearby line
+    break around ``page_size`` so a paragraph is not cut in half.
+    """
+
+    if page_size < 1:
+        raise ValueError("page_size must be positive")
+    if not text:
+        return [""]
+
+    chapter_starts = [match.start() for match in _CHAPTER_HEADING_RE.finditer(text)]
+    if chapter_starts:
+        # Start the first page at zero so title pages and other front matter are
+        # not lost or presented as a misleading chapter of their own.
+        boundaries = [0, *chapter_starts[1:], len(text)]
+        return [text[start:end] for start, end in zip(boundaries, boundaries[1:])]
+
+    pages: list[str] = []
+    start = 0
+    length = len(text)
+    while start < length:
+        target = min(start + page_size, length)
+        if target < length:
+            lower = start + page_size * 4 // 5
+            upper = min(length, start + page_size * 6 // 5)
+            after = text.find("\n", target, upper)
+            before = text.rfind("\n", lower, target)
+            if after != -1:
+                target = after + 1
+            elif before != -1:
+                target = before + 1
+        pages.append(text[start:target])
+        start = target
+    return pages
 
 
 def clean(text: str) -> str:

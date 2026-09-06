@@ -17,7 +17,7 @@ the COCA 20,000 frequency list and graded syllabus word lists.
 
 - **🃏 Flashcards (`/cards`)** — Review words and mark how well you know each one
   with 1–5 buttons. Familiarity levels and an explanation are shown at the bottom.
-- **📖 Read & Mark (`/read`)** — Upload an article or book (`.txt .md .html .pdf .epub`);
+- **📖 Read & Mark (`/read`)** — Upload an article, book, or common text subtitle file (`.txt .md .html .pdf .epub .srt .vtt .ass` and more);
   known words are highlighted by familiarity. Click any word you don't know to drop it
   to *Unfamiliar*. A **library panel** lists previously uploaded books so you can reopen
   them without re-uploading.

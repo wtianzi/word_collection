@@ -1,24 +1,52 @@
 {
   "books": {
-    "The thirty nine steps.txt.txt": {
+    "chapter_101_150.txt": {
+      "percent": 0,
+      "scroll": 0,
+      "page": 0,
+      "updated": "2026-09-06T14:38:04+00:00"
+    },
+    "chapter_151_200.txt": {
+      "percent": 0,
+      "scroll": 0,
+      "page": 0,
+      "updated": "2026-08-18T04:02:39+00:00"
+    },
+    "chapter_201_250.txt": {
+      "percent": 0,
+      "scroll": 0,
+      "page": 0,
+      "updated": "2026-08-23T18:33:00+00:00"
+    },
+    "lord_of_mystries/vol_1_chapters_001_050.txt": {
+      "percent": 100,
+      "scroll": 45754,
+      "page": 5,
+      "updated": "2026-09-03T00:56:42+00:00"
+    },
+    "lord_of_mystries/vol_1_chapters_051_100.txt": {
+      "percent": 100,
+      "scroll": 20550,
+      "page": 5,
+      "updated": "2026-09-06T02:31:31+00:00"
+    },
+    "english_novels/OHenry.txt": {
+      "percent": 15,
+      "scroll": 49609,
+      "page": 0,
+      "updated": "2026-09-06T14:16:18+00:00"
+    },
+    "english_novels/The thirty nine steps.txt.txt": {
       "percent": 0,
       "scroll": 127,
+      "page": 0,
       "updated": "2026-08-08T13:27:44+00:00"
     },
-    "Full text of Charlottes Web.txt": {
+    "read_finished/Full text of Charlottes Web.txt": {
       "percent": 15,
       "scroll": 33600,
+      "page": 0,
       "updated": "2026-08-09T18:18:29+00:00"
-    },
-    "OHenry.txt": {
-      "percent": 21,
-      "scroll": 49609,
-      "updated": "2026-08-11T22:43:11+00:00"
-    },
-    "Clown - LotM Vol. 1_djvu.txt": {
-      "percent": 1,
-      "scroll": 41279,
-      "updated": "2026-08-15T13:08:33+00:00"
     }
   }
 }

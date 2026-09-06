@@ -29,16 +29,18 @@ def _now() -> str:
 class BookProgress:
     percent: int = 0  # 0-100, how far through the book
     scroll: int = 0  # pixel offset to restore the exact reading position
+    page: int = 0  # zero-based page number for paginated reading
     updated: str = ""
 
     def to_dict(self) -> dict:
-        return {"percent": self.percent, "scroll": self.scroll, "updated": self.updated}
+        return {"percent": self.percent, "scroll": self.scroll, "page": self.page, "updated": self.updated}
 
     @classmethod
     def from_dict(cls, data: dict) -> "BookProgress":
         return cls(
             percent=_clamp_percent(data.get("percent", 0)),
             scroll=max(0, _as_int(data.get("scroll", 0))),
+            page=max(0, _as_int(data.get("page", 0))),
             updated=str(data.get("updated", "")),
         )
 
@@ -95,7 +97,7 @@ class ReadingProgressStore:
     def all(self) -> dict[str, BookProgress]:
         return dict(self._data)
 
-    def set(self, name: str, percent: int, scroll: int) -> BookProgress:
+    def set(self, name: str, percent: int, scroll: int, page: int = 0) -> BookProgress:
         """Store the reading position for ``name`` and persist it."""
 
         key = (name or "").strip()
@@ -104,6 +106,7 @@ class ReadingProgressStore:
         bp = BookProgress(
             percent=_clamp_percent(percent),
             scroll=max(0, _as_int(scroll)),
+            page=max(0, _as_int(page)),
             updated=_now(),
         )
         with self._lock:
@@ -119,3 +122,30 @@ class ReadingProgressStore:
             del self._data[key]
             self._save()
         return True
+
+    def rename(self, old_name: str, new_name: str) -> bool:
+        """Move a saved position to a new book identifier."""
+
+        old_key = (old_name or "").strip()
+        new_key = (new_name or "").strip()
+        if not old_key or not new_key:
+            raise ValueError("book names are required")
+        with self._lock:
+            if old_key not in self._data:
+                return False
+            self._data[new_key] = self._data.pop(old_key)
+            self._save()
+        return True
+
+    def rename_prefix(self, old_prefix: str, new_prefix: str) -> int:
+        """Move positions for every book below a renamed folder."""
+
+        old = old_prefix.strip("/") + "/"
+        new = new_prefix.strip("/") + "/"
+        with self._lock:
+            matches = [key for key in self._data if key.startswith(old)]
+            for key in matches:
+                self._data[new + key[len(old):]] = self._data.pop(key)
+            if matches:
+                self._save()
+        return len(matches)
