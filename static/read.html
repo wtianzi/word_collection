@@ -59,11 +59,34 @@
     .folder .folder-count { color:var(--muted); font-size:12px; font-weight:400; }
     .folder button { background:transparent; border:0; color:var(--muted); cursor:pointer; padding:3px; }
     .folder button:hover { color:var(--accent); }
+    .folder .folder-toggle { color:var(--text); font-size:14px; width:24px;
+      padding:2px; transition:transform .15s; }
+    .folder .folder-toggle.collapsed { transform:rotate(-90deg); }
+    .folder-files { display:flex; flex-direction:column; gap:8px; }
+    .folder-files.collapsed { display:none; }
+    .folder.folder-drop { border:1px dashed transparent; border-radius:10px;
+      padding:7px 9px; transition:border-color .15s,background .15s; }
+    .folder.root-drop { color:var(--muted); margin-top:4px; }
+    .library.drag-active .folder-drop { border-color:var(--card2); }
+    .folder-drop.drag-over { border-color:var(--accent)!important;
+      background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); }
     .lib-list { display:flex; flex-direction:column; gap:8px; }
     .book { display:flex; align-items:center; gap:12px; background:var(--card);
       border:1px solid var(--card2); border-radius:12px; padding:12px 14px;
       cursor:pointer; transition:border-color .15s, background .15s; }
     .book:hover { border-color:var(--accent); background:var(--card2); }
+    .book.dragging { opacity:.48; border-color:var(--accent); }
+    .book.long-press { transform:scale(.99); border-color:var(--accent); }
+    .book .drag-handle { flex:none; border:0; background:transparent; color:var(--muted);
+      font-size:20px; line-height:1; padding:10px 5px; margin:-8px 0 -8px -6px;
+      cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
+      -webkit-touch-callout:none; }
+    .book .drag-handle:active { cursor:grabbing; color:var(--accent); }
+    .touch-drag-ghost { position:fixed; z-index:100; left:0; top:0; max-width:70vw;
+      pointer-events:none; background:var(--card); color:var(--text); border:1px solid var(--accent);
+      border-radius:10px; padding:9px 13px; font-size:14px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; box-shadow:0 10px 28px var(--shadow);
+      transform:translate(14px,-50%); }
     .book .bi { font-size:22px; }
     .book .info { flex:1; min-width:0; }
     .book .nm { font-size:15px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -88,6 +111,21 @@
     #content .w { border-radius:4px; padding:0 1px; cursor:pointer; }
     #content .w.hl { color:var(--highlight-text); }
     #content .w.done { outline:2px solid #ef4444; outline-offset:1px; }
+    .page-vocab {
+      margin-top:48px; padding:22px 20px; background:var(--card);
+      border:1px solid var(--card2); border-radius:16px;
+    }
+    .page-vocab-head { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+    .page-vocab-head h2 { margin:0; font-size:19px; }
+    .page-vocab-count { color:var(--muted); font-size:13px; }
+    .page-vocab-note { color:var(--muted); font-size:13px; margin-bottom:12px; }
+    .page-vocab-item { display:flex; align-items:center; gap:12px; padding:9px 2px; border-top:1px solid var(--divider); }
+    .page-vocab-hw { min-width:120px; font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+    .page-vocab-tr { flex:1; min-width:0; color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .page-vocab-stars { flex:none; font-size:20px; letter-spacing:2px; white-space:nowrap; }
+    .page-vocab-stars .star { cursor:pointer; color:#475569; }
+    .page-vocab-stars .star.on { color:#fbbf24; }
+    .page-vocab-empty { color:var(--muted); font-size:14px; padding:8px 0 2px; }
     .pager { display:none; position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
       align-items:center; justify-content:center; gap:14px; padding:10px 14px;
       background:var(--floating-bg); border:1px solid var(--card2); border-radius:14px;
@@ -97,6 +135,10 @@
     .pager button:disabled { opacity:.4; cursor:default; }
     #pageInfo { color:var(--muted); min-width:90px; text-align:center; font-size:14px; }
     @media (max-width:520px) {
+      .page-vocab { padding:18px 15px; }
+      .page-vocab-item { gap:8px; }
+      .page-vocab-hw { min-width:88px; max-width:88px; }
+      .page-vocab-stars { font-size:17px; letter-spacing:0; }
       .pager { left:10px; right:10px; bottom:10px; transform:none; gap:8px; }
       .pager button { flex:1; padding:9px 8px; }
       #pageInfo { min-width:76px; font-size:13px; }
@@ -106,6 +148,7 @@
       position:fixed; left:0; right:0; top:0; background:var(--surface);
       border-bottom:1px solid var(--card2); padding:calc(14px + env(safe-area-inset-top)) 18px 16px;
       transform:translateY(-115%); transition:transform .2s; z-index:20;
+      max-height:85vh; overflow-y:auto;
     }
     #panel.show { transform:translateY(0); }
     #panel .panel-head { display:flex; align-items:flex-start; gap:12px; }
@@ -120,8 +163,8 @@
     }
     #panel .speak:hover { border-color:var(--accent); color:var(--accent); }
     #panel .speak:active { transform:scale(.94); }
-    #panel .fam { margin-top:6px; font-size:13px; color:var(--muted); }
     #panel .tr { margin-top:8px; white-space:pre-line; font-size:16px; line-height:1.6; }
+    #panel .morpheme { margin-top:8px; color:var(--muted); font-size:14px; line-height:1.5; }
     #panel .row { display:flex; align-items:center; gap:12px; }
     #panel .rank {
       flex:1; background:var(--card); color:var(--text); border:1px solid var(--card2);
@@ -243,9 +286,9 @@
     <div class="drop" id="drop" onclick="document.getElementById('file').click()">
       <div class="icon">📖</div>
       <div>点击上传文章 / 书籍</div>
-      <p>支持 .txt .md .html .pdf .epub 及常见字幕格式</p>
+      <p>支持 .txt .md .html .pdf .epub .srt .vtt .ass 等字幕格式</p>
     </div>
-    <input type="file" id="file" accept=".txt,.text,.md,.markdown,.html,.htm,.pdf,.epub,.srt,.vtt,.ass,.ssa,.sub,.sbv,.lrc,.smi,.ttml,.dfxp" style="display:none" />
+    <input type="file" id="file" accept="text/*,application/x-subrip,application/pdf,application/epub+zip,.txt,.text,.md,.markdown,.html,.htm,.pdf,.epub,.srt,.vtt,.ass,.ssa,.sub,.sbv,.lrc,.smi,.ttml,.dfxp" style="display:none" />
     <div class="opts">
       高亮范围：从
       <select id="minFam" onchange="syncFamRange('min')">
@@ -290,6 +333,14 @@
       </span>
     </div>
     <div id="content"></div>
+    <section class="page-vocab" id="pageVocab" aria-labelledby="pageVocabTitle">
+      <div class="page-vocab-head">
+        <h2 id="pageVocabTitle">本章生词</h2>
+        <span class="page-vocab-count" id="pageVocabCount"></span>
+      </div>
+      <div class="page-vocab-note" id="pageVocabNote"></div>
+      <div id="pageVocabBody"></div>
+    </section>
     <div class="pager" id="pager">
       <button id="prevPage" onclick="changePage(-1)">← 上一页</button>
       <span id="pageInfo"></span>
@@ -322,10 +373,10 @@
           <span class="hw"></span><span class="ph"></span>
           <button class="speak" id="speakBtn" title="朗读单词">🔊</button>
         </div>
-        <div class="fam"></div>
       </div>
     </div>
     <div class="tr"></div>
+    <div class="morpheme" id="morphemeExplanation" hidden></div>
     <div class="row" style="margin-top:12px">
       <button class="rank down" id="rankDown">↓ 调低熟悉度</button>
       <button class="rank up" id="rankUp">↑ 调高熟悉度</button>
@@ -343,7 +394,7 @@
 
 <script>
 const FAM_LABELS = {1:'陌生 Unfamiliar',2:'学习中 Learning',3:'熟悉 Familiar',4:'熟练 Proficient',5:'掌握 Mastered'};
-const FAM_COLOR = {1:'#ef4444',2:'#f59e0b',3:'#eab308',4:'#84cc16',5:'#22c55e'};
+const FAM_COLOR = {1:'#ef4444',2:'#f59e0b',3:'#84cc16',4:'#16c0cc',5:'#58585b'};
 const UNKNOWN_COLOR = '#a855f7';
 const THEME_KEY = 'read-theme';
 
@@ -452,6 +503,55 @@ function fmtDate(ts) {
   return d.toLocaleString();
 }
 
+let draggedBook = null;
+let suppressBookClickUntil = 0;
+function loadCollapsedFolders() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('collapsedLibraryFolders') || '[]');
+    return new Set(Array.isArray(saved) ? saved : []);
+  } catch (_) { return new Set(); }
+}
+const collapsedFolders = loadCollapsedFolders();
+
+function folderStateKey(folder) { return folder || '__root__'; }
+function saveCollapsedFolders() {
+  localStorage.setItem('collapsedLibraryFolders', JSON.stringify([...collapsedFolders]));
+}
+
+function toggleFolder(folder, button, filesEl) {
+  const key = folderStateKey(folder);
+  const collapsed = !filesEl.classList.contains('collapsed');
+  filesEl.classList.toggle('collapsed', collapsed);
+  button.classList.toggle('collapsed', collapsed);
+  button.setAttribute('aria-expanded', String(!collapsed));
+  button.title = collapsed ? '展开文件夹' : '收起文件夹';
+  if (collapsed) collapsedFolders.add(key); else collapsedFolders.delete(key);
+  saveCollapsedFolders();
+}
+
+function makeFolderDropTarget(el, folder) {
+  el.classList.add('folder-drop');
+  el.dataset.folder = folder || '';
+  el.addEventListener('dragover', ev => {
+    if (!draggedBook) return;
+    ev.preventDefault();
+    el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', async ev => {
+    ev.preventDefault();
+    el.classList.remove('drag-over');
+    if (draggedBook) await moveBookTo(draggedBook.path, draggedBook.folder, folder || null);
+  });
+}
+
+function clearDragState() {
+  document.getElementById('library').classList.remove('drag-active');
+  document.querySelectorAll('.drag-over,.dragging,.long-press').forEach(el =>
+    el.classList.remove('drag-over','dragging','long-press'));
+  draggedBook = null;
+}
+
 async function loadLibrary() {
   const list = document.getElementById('libList');
   list.innerHTML = '<div class="lib-empty">加载中…</div>';
@@ -468,6 +568,21 @@ async function loadLibrary() {
     const groups = [{ name: null, files: files.filter(f => !f.folder) }]
       .concat(libraryFolders.map(name => ({ name, files: files.filter(f => f.folder === name) })));
     groups.forEach(group => {
+      const filesEl = document.createElement('div');
+      filesEl.className = 'folder-files';
+      const collapsed = collapsedFolders.has(folderStateKey(group.name));
+      filesEl.classList.toggle('collapsed', collapsed);
+      const toggle = document.createElement('button');
+      toggle.className = 'folder-toggle';
+      toggle.classList.toggle('collapsed', collapsed);
+      toggle.textContent = '▾';
+      toggle.title = collapsed ? '展开文件夹' : '收起文件夹';
+      toggle.setAttribute('aria-label', toggle.title);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.onclick = ev => {
+        ev.stopPropagation();
+        toggleFolder(group.name, toggle, filesEl);
+      };
       if (group.name) {
         const head = document.createElement('div');
         head.className = 'folder';
@@ -482,10 +597,23 @@ async function loadLibrary() {
         const remove = document.createElement('button');
         remove.textContent = '删除';
         remove.onclick = () => deleteFolder(group.name);
-        head.append(title, count, rename, remove);
+        head.append(toggle, title, count, rename, remove);
+        makeFolderDropTarget(head, group.name);
+        list.appendChild(head);
+      } else {
+        const head = document.createElement('div');
+        head.className = 'folder root-drop';
+        const title = document.createElement('span');
+        title.textContent = '📚 根目录';
+        const count = document.createElement('span');
+        count.className = 'folder-count';
+        count.textContent = `${group.files.length} 项`;
+        head.append(toggle, title, count);
+        makeFolderDropTarget(head, null);
         list.appendChild(head);
       }
-      group.files.forEach(f => renderBook(f, list));
+      group.files.forEach(f => renderBook(f, filesEl));
+      list.appendChild(filesEl);
     });
   } catch (e) {
     list.innerHTML = '<div class="lib-empty">加载失败：' + e.message + '</div>';
@@ -495,11 +623,13 @@ async function loadLibrary() {
 function renderBook(f, list) {
       const el = document.createElement('div');
       el.className = 'book';
+      el.draggable = true;
       const pct = (typeof f.percent === 'number') ? f.percent : null;
       const badge = pct === null
         ? ''
         : `<span class="prog">${pct >= 100 ? '已读完' : pct + '%'}</span>`;
       el.innerHTML =
+        `<button class="drag-handle" type="button" title="按住拖动" aria-label="按住拖动书籍">⠿</button>` +
         `<span class="bi">📗</span>` +
         `<div class="info"><div class="nm"></div>` +
         `<div class="sub">${fmtSize(f.size)} · ${fmtDate(f.modified)}</div></div>` +
@@ -509,7 +639,24 @@ function renderBook(f, list) {
         `<button class="delete-btn" title="删除书籍">🗑 删除</button>` +
         `<span class="go">→</span>`;
       el.querySelector('.nm').textContent = f.name;
-      el.addEventListener('click', () => openBook(f.path));
+      el.addEventListener('click', () => {
+        if (Date.now() >= suppressBookClickUntil) openBook(f.path);
+      });
+      el.addEventListener('dragstart', ev => {
+        if (ev.target.closest('button') && !ev.target.closest('.drag-handle')) {
+          ev.preventDefault(); return;
+        }
+        draggedBook = {path:f.path, folder:f.folder || null};
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', f.path);
+        el.classList.add('dragging');
+        document.getElementById('library').classList.add('drag-active');
+      });
+      el.addEventListener('dragend', () => {
+        suppressBookClickUntil = Date.now() + 300;
+        clearDragState();
+      });
+      enableTouchDrag(el.querySelector('.drag-handle'), el, f);
       el.querySelector('.wl-btn').addEventListener('click', (ev) => {
         ev.stopPropagation();
         openWordList(f.path);
@@ -523,6 +670,74 @@ function renderBook(f, list) {
         deleteBook(f.path, el);
       });
       list.appendChild(el);
+}
+
+function enableTouchDrag(handle, row, book) {
+  let timer = null, active = false, pointerId = null, target = null, ghost = null;
+  const stopTimer = () => { if (timer) clearTimeout(timer); timer = null; };
+  const moveGhost = ev => {
+    if (!ghost) return;
+    ghost.style.left = `${ev.clientX}px`;
+    ghost.style.top = `${ev.clientY}px`;
+  };
+  handle.addEventListener('click', ev => ev.stopPropagation());
+  handle.addEventListener('contextmenu', ev => ev.preventDefault());
+  handle.addEventListener('pointerdown', ev => {
+    ev.stopPropagation();
+    if (ev.pointerType === 'mouse') return;
+    pointerId = ev.pointerId;
+    handle.setPointerCapture(pointerId);
+    timer = setTimeout(() => {
+      active = true;
+      draggedBook = {path:book.path, folder:book.folder || null};
+      row.classList.add('dragging','long-press');
+      document.getElementById('library').classList.add('drag-active');
+      ghost = document.createElement('div');
+      ghost.className = 'touch-drag-ghost';
+      ghost.textContent = `📗 ${book.name}`;
+      document.body.appendChild(ghost);
+      moveGhost(ev);
+      if (navigator.vibrate) navigator.vibrate(25);
+    }, 350);
+  });
+  handle.addEventListener('pointermove', ev => {
+    if (!active) return;
+    ev.preventDefault();
+    moveGhost(ev);
+    if (ev.clientY < 80) window.scrollBy({top:-12, behavior:'auto'});
+    else if (ev.clientY > window.innerHeight - 80) window.scrollBy({top:12, behavior:'auto'});
+    const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+    const next = hit && hit.closest('.folder-drop');
+    if (target !== next) {
+      if (target) target.classList.remove('drag-over');
+      target = next;
+      if (target) target.classList.add('drag-over');
+    }
+  });
+  const finish = async ev => {
+    stopTimer();
+    if (!active) return;
+    ev.preventDefault();
+    suppressBookClickUntil = Date.now() + 500;
+    const folder = target ? (target.dataset.folder || null) : undefined;
+    active = false;
+    target = null;
+    if (ghost) ghost.remove();
+    ghost = null;
+    clearDragState();
+    if (folder !== undefined) await moveBookTo(book.path, book.folder, folder);
+  };
+  handle.addEventListener('pointerup', finish);
+  handle.addEventListener('pointercancel', () => {
+    stopTimer();
+    if (ghost) ghost.remove();
+    ghost = null;
+    if (active) {
+      active = false;
+      suppressBookClickUntil = Date.now() + 500;
+      clearDragState();
+    }
+  });
 }
 
 async function apiJSON(url, options) {
@@ -567,15 +782,20 @@ async function moveBook(path, currentFolder) {
     document.getElementById('status').textContent = '请输入列表中的有效编号。'; return;
   }
   const folder = index === 0 ? null : libraryFolders[index - 1];
+  await moveBookTo(path, currentFolder, folder);
+}
+
+async function moveBookTo(path, currentFolder, folder) {
   if ((folder || null) === (currentFolder || null)) return;
   try {
     await apiJSON('/api/uploads/move', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:path, folder}) });
+    document.getElementById('status').textContent = folder ? `已移动到「${folder}」。` : '已移动到根目录。';
     await loadLibrary();
   } catch (e) { document.getElementById('status').textContent = '移动失败：' + e.message; }
 }
 
 async function deleteBook(name, row) {
-  if (!confirm(`确定删除《${name}》吗？\n书籍文件和阅读进度都会被删除。`)) return;
+  if (!confirm(`确定删除《${name}》吗？\n书籍文件和阅读进度会被删除；这本书中一颗星的词会从“我的词表”移除，两颗星及以上的词会保留。`)) return;
   const button = row.querySelector('.delete-btn');
   button.disabled = true;
   try {
@@ -584,7 +804,7 @@ async function deleteBook(name, row) {
     const result = await res.json();
     row.remove();
     document.getElementById('status').textContent =
-      `已删除 ${name}，并从全局词表移除 ${result.removed_words || 0} 个未学习单词。`;
+      `已删除 ${name}，从“我的词表”移除 ${result.removed_words || 0} 个一颗星单词；两颗星及以上的词已保留。`;
     if (!document.querySelector('#libList .book')) {
       document.getElementById('libList').innerHTML = '<div class="lib-empty">还没有上传过书籍。</div>';
     }
@@ -840,6 +1060,7 @@ function showReader(data) {
     + (data.added ? ` · 新增 ${data.added.toLocaleString()} 个到「我的单词」` : '');
   document.getElementById('content').innerHTML = data.body;
   bindWords();
+  renderPageVocabulary();
   currentBook = data.track_progress === false ? null : data.name;
   currentPage = Number.isInteger(data.page) ? data.page : 0;
   totalPages = Number.isInteger(data.total_pages) ? data.total_pages : 1;
@@ -912,12 +1133,108 @@ function bindWords() {
   });
 }
 
+// Build the glossary from this page's highlighted spans, so it always matches
+// the familiarity range selected when the reader opened.
+function renderPageVocabulary() {
+  const unique = new Map();
+  document.querySelectorAll('#content .w.hl').forEach(el => {
+    const key = el.dataset.hw.toLowerCase();
+    if (!unique.has(key)) unique.set(key, el);
+  });
+
+  const body = document.getElementById('pageVocabBody');
+  document.getElementById('pageVocabCount').textContent = unique.size + ' 个';
+  document.getElementById('pageVocabNote').textContent =
+    '仅显示当前高亮范围：Level ' + readMinFam + '–' + readMaxFam;
+  body.innerHTML = '';
+  if (!unique.size) {
+    body.innerHTML = '<div class="page-vocab-empty">本章在所选 Level 范围内没有生词。</div>';
+    return;
+  }
+
+  unique.forEach(el => {
+    const item = document.createElement('div');
+    item.className = 'page-vocab-item';
+    const fam = parseInt(el.dataset.fam, 10) || 1;
+    const headword = document.createElement('span');
+    headword.className = 'page-vocab-hw';
+    headword.textContent = el.dataset.hw;
+    headword.title = el.dataset.hw;
+    headword.addEventListener('click', event => { event.stopPropagation(); openPanel(el); });
+    item.appendChild(headword);
+
+    const translation = document.createElement('span');
+    translation.className = 'page-vocab-tr';
+    translation.textContent = (el.dataset.tr || '(无释义)').split('\n')[0];
+    translation.title = el.dataset.tr || '(无释义)';
+    item.appendChild(translation);
+
+    const stars = document.createElement('span');
+    stars.className = 'page-vocab-stars';
+    [1, 2, 3, 4, 5].forEach(level => {
+      const star = document.createElement('span');
+      star.className = 'star' + (level <= fam ? ' on' : '');
+      star.textContent = '★';
+      star.title = '设置熟悉度为 ' + level;
+      star.addEventListener('click', event => {
+        event.stopPropagation();
+        setPageVocabLevel(el, level);
+      });
+      stars.appendChild(star);
+    });
+    item.appendChild(stars);
+    body.appendChild(item);
+  });
+}
+
+async function setPageVocabLevel(el, level) {
+  const word = el.dataset.hw;
+  const current = parseInt(el.dataset.fam, 10);
+  if (current === level && el.dataset.excluded !== '1') return;
+  try {
+    const data = await postJSON('/api/familiarity', { word, level });
+    applyWordState(word, data.familiarity, false);
+    toast(word + ' → ' + data.familiarity_label);
+  } catch (error) {
+    toast('保存失败');
+  }
+}
+
 const panel = document.getElementById('panel');
 
-function openPanel(el) {
+const morphemeCache = new Map();
+let morphemeRequest = 0;
+
+async function openPanel(el) {
   activeEl = el;
   refreshPanel();
   panel.classList.add('show');
+  const word = el.dataset.hw.toLowerCase();
+  const request = ++morphemeRequest;
+  const explanation = document.getElementById('morphemeExplanation');
+  explanation.hidden = true;
+  explanation.textContent = "";
+  try {
+    let data = morphemeCache.get(word);
+    if (!data) {
+      const response = await fetch('/api/morphemes/explain?word=' + encodeURIComponent(word));
+      if (!response.ok) throw new Error(response.statusText);
+      data = await response.json();
+      morphemeCache.set(word, data);
+    }
+    if (request !== morphemeRequest || activeEl !== el) return;
+    if (data.parts.length) {
+      const pieces = data.parts.map(part => `${part.form}（${part.meaning}）`).join(" + ");
+      const label = data.language === 'en' ? '词根词缀（英文释义）' : '词根词缀';
+      explanation.textContent = `${label}：${pieces}${data.note ? " · " + data.note : ""}`;
+      explanation.hidden = false;
+    }
+  } catch (error) {
+    if (request === morphemeRequest) {
+      explanation.textContent = "词根词缀解释暂时无法加载";
+      explanation.hidden = false;
+    }
+  }
 }
 
 function refreshPanel() {
@@ -927,9 +1244,6 @@ function refreshPanel() {
   panel.querySelector('.hw').textContent = activeEl.dataset.hw;
   panel.querySelector('.ph').textContent = activeEl.dataset.ph ? '[' + activeEl.dataset.ph + ']' : '';
   panel.querySelector('.tr').textContent = activeEl.dataset.tr;
-  panel.querySelector('.fam').textContent = excluded
-    ? '当前：已移出学习流程（忽略 / 掌握）'
-    : '当前：' + (FAM_LABELS[fam] || fam);
   document.querySelectorAll('#stars .star').forEach(s => {
     s.classList.toggle('on', !excluded && parseInt(s.dataset.n, 10) <= fam);
   });
@@ -951,6 +1265,11 @@ function applyWordState(word, fam, excluded) {
       ? (inVocab ? (FAM_COLOR[fam] || FAM_COLOR[1]) : UNKNOWN_COLOR)
       : '';
   });
+  renderPageVocabulary();
+  const visibleCount = document.querySelectorAll('#pageVocabBody .page-vocab-item').length;
+  document.getElementById('counts').textContent = document.getElementById('counts').textContent.replace(
+    /\d[\d,]* 个高亮生词/, visibleCount.toLocaleString() + ' 个高亮生词'
+  );
 }
 
 async function postJSON(url, body) {

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from .ignore import IgnoreStore
 from .loader import load_dataset
 from .mastered import MasteredStore
+from .morphemes import MorphemeDictionary
 from .models import (
     FAMILIARITY_LABELS,
     GRADED_LEVEL_LABELS,
@@ -41,19 +42,26 @@ class VocabService:
         self.progress = ProgressStore()
         self.ignore = IgnoreStore()
         self.mastered = MasteredStore()
+        self.morphemes = MorphemeDictionary()
         self.reading_progress = ReadingProgressStore()
         self.resolver = LemmaResolver(self.dataset)
-        # Pre-sort each difficulty level by frequency (most common first).
+        # Card pools contain canonical learning keys only.  Without this step,
+        # an inflected entry such as ``could`` queried progress under ``could``
+        # even though grading it was correctly stored under ``can``.
         self.by_level: dict[str, list[str]] = {}
         for level in GRADED_LEVELS:
-            words = [
-                key
+            words = {
+                self.canonical_word(key)
                 for key, entry in self.dataset.items()
                 if level in entry.levels
-            ]
-            words.sort(key=self._freq_key)
-            self.by_level[level] = words
-        self.all_words: list[str] = sorted(self.dataset, key=self._freq_key)
+            }
+            self.by_level[level] = sorted(words, key=self._freq_key)
+        canonical_words = {self.canonical_word(key) for key in self.dataset}
+        self.all_words: list[str] = sorted(canonical_words, key=self._freq_key)
+        # Search still accepts surface spellings, then returns their canonical
+        # entry, so looking up "could" can find "can" without creating a
+        # separate learning record.
+        self.search_words: list[str] = sorted(self.dataset)
 
     def _freq_key(self, key: str) -> tuple[int, str]:
         rank = self.dataset[key].frequency_rank
@@ -483,8 +491,22 @@ def create_app() -> FastAPI:
         q = q.strip().lower()
         if not q:
             return {"words": []}
-        matches = [k for k in service.all_words if k.startswith(q)][:limit]
+        matches: list[str] = []
+        seen: set[str] = set()
+        for surface in service.search_words:
+            if not surface.startswith(q):
+                continue
+            key = service.canonical_word(surface)
+            if key not in seen:
+                matches.append(key)
+                seen.add(key)
+            if len(matches) >= limit:
+                break
         return {"words": [service._entry_payload(k) for k in matches]}
+
+    @app.get("/api/morphemes/explain")
+    def explain_morphemes(word: str) -> dict:
+        return service.morphemes.explain(word, service.dataset)
 
     @app.post("/api/review")
     def review(req: ReviewRequest) -> dict:
@@ -857,6 +879,7 @@ def create_app() -> FastAPI:
     @app.get("/dictionary")
     def dictionary_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "dictionary.html")
+
 
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

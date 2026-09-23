@@ -15,6 +15,8 @@ the COCA 20,000 frequency list and graded syllabus word lists.
 
 ## Features
 
+- **Word roots while reading** — Click a word in Read & Mark to see matching roots
+  and affixes beneath its existing dictionary translation.
 - **🃏 Flashcards (`/cards`)** — Review words and mark how well you know each one
   with 1–5 buttons. Familiarity levels and an explanation are shown at the bottom.
 - **📖 Read & Mark (`/read`)** — Upload an article, book, or common text subtitle file (`.txt .md .html .pdf .epub .srt .vtt .ass` and more);

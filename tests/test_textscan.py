@@ -87,6 +87,10 @@ class LemmaResolverTests(unittest.TestCase):
             "study": WordEntry(word="study"),
             "studying": WordEntry(word="studying", exchange={"0": "studied"}),
             "studied": WordEntry(word="studied", exchange={"0": "study"}),
+            "numb": WordEntry(word="numb", coca=9000, exchange={"r": "number"}),
+            "number": WordEntry(
+                word="number", coca=200, exchange={"0": "numb", "1": "r"}
+            ),
         }
         self.resolver = LemmaResolver(self.dataset)
 
@@ -104,6 +108,9 @@ class LemmaResolverTests(unittest.TestCase):
 
     def test_chained_dictionary_lemmas_reach_a_stable_base(self) -> None:
         self.assertEqual(self.resolver.resolve("studying"), "study")
+
+    def test_common_independent_word_is_not_changed_to_a_rare_lemma(self) -> None:
+        self.assertEqual(self.resolver.resolve("number"), "number")
 
 
 if __name__ == "__main__":

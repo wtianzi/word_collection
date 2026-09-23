@@ -14,9 +14,9 @@
       --accent: #38bdf8;
       --f1: #ef4444; /* unfamiliar */
       --f2: #f59e0b; /* learning */
-      --f3: #eab308; /* familiar */
-      --f4: #84cc16; /* proficient */
-      --f5: #22c55e; /* mastered */
+      --f3: #84cc16; /* familiar */
+      --f4: #16c0cc; /* proficient */
+      --f5: #58585b; /* mastered */
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
@@ -212,6 +212,8 @@ let meta = null;
 let queue = [];
 let current = null;
 let revealed = false;
+let queueEpoch = 0;
+let refillPending = false;
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -312,6 +314,9 @@ async function loadStats() {
 }
 
 async function loadQueue(reset) {
+  const requestEpoch = reset ? ++queueEpoch : queueEpoch;
+  if (!reset && refillPending) return;
+  if (!reset) refillPending = true;
   const level = currentLevel();
   const params = new URLSearchParams();
   if (level) params.set('level', level);
@@ -319,21 +324,43 @@ async function loadQueue(reset) {
   params.set('max_familiarity', String(range.max));
   params.set('min_familiarity', String(range.min));
   params.set('limit', '30');
-  const data = await api('/api/study?' + params.toString());
-  queue = data.words;
-  if (reset) showNext();
+  try {
+    const data = await api('/api/study?' + params.toString());
+    // A familiarity/filter change may finish while this request is in flight.
+    // Never let that stale response put an already-rated word back.
+    if (requestEpoch !== queueEpoch) return;
+    if (reset) {
+      queue = data.words;
+      showNext();
+    } else {
+      const present = new Set(queue.map(item => item.word));
+      if (current) present.add(current.word);
+      for (const item of data.words) {
+        if (!present.has(item.word)) {
+          queue.push(item);
+          present.add(item.word);
+        }
+      }
+    }
+  } finally {
+    if (!reset) {
+      refillPending = false;
+      if (requestEpoch !== queueEpoch && current && queue.length < 5) loadQueue(false);
+    }
+  }
 }
 
 function showNext() {
   revealed = false;
-  document.getElementById('controls').style.visibility = 'hidden';
   if (queue.length === 0) {
     current = null;
+    document.getElementById('controls').style.visibility = 'hidden';
     document.getElementById('cardContent').innerHTML =
       '<div class="empty">🎉 本组已学完！<br/>All caught up for this level.</div>';
     return;
   }
   current = queue.shift();
+  document.getElementById('controls').style.visibility = 'visible';
   renderCard();
   if (queue.length < 5) loadQueue(false);
 }
@@ -393,10 +420,16 @@ async function setLevel(level, ev) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ word, level })
     });
+    // Invalidate any refill that started with the word's previous level and
+    // remove defensive duplicates already present in the local queue.
+    queueEpoch++;
+    queue = queue.filter(item => item.word !== word);
     toast(`${word} → ${res.familiarity_label}`);
-  } catch (e) { /* ignore */ }
-  loadStats();
-  showNext();
+    loadStats();
+    showNext();
+  } catch (e) {
+    toast('熟练度更新失败，请重试');
+  }
 }
 
 let toastTimer = null;
@@ -412,7 +445,7 @@ function toast(msg) {
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ') { e.preventDefault(); toggleReveal(); }
   else if ((e.key === 'p' || e.key === 'P') && current) { speak(current.word); }
-  else if (revealed && ['1','2','3','4','5'].includes(e.key)) {
+  else if (current && ['1','2','3','4','5'].includes(e.key)) {
     setLevel(+e.key);
   }
 });

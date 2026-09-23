@@ -124,13 +124,40 @@ class LemmaResolver:
     def __init__(self, dataset: dict[str, WordEntry]) -> None:
         self._dataset = dataset
         self._inflections: dict[str, str] = {}
+
+        def is_more_common_headword(form: str, lemma: str) -> bool:
+            """Keep an ambiguous form when it is the likelier standalone word.
+
+            ECDICT, for example, describes ``number`` as both the common noun
+            and the comparative of the much rarer adjective ``numb``.  With no
+            sentence-level POS tagger, frequency is a safer tie-breaker than
+            blindly turning the common standalone word into the rare lemma.
+            """
+
+            form_entry = dataset.get(form)
+            lemma_entry = dataset.get(lemma)
+            if form_entry is None or lemma_entry is None:
+                return False
+            form_rank = form_entry.frequency_rank
+            lemma_rank = lemma_entry.frequency_rank
+            return (
+                form_rank is not None
+                and lemma_rank is not None
+                and form_rank < lemma_rank
+            )
+
         # An ECDICT row for an inflected headword can itself be present in the
         # graded dataset (for example ``running`` or ``better``).  Record its
         # explicit lemma first so an exact dataset match cannot hide that
         # relationship.
         for key, entry in dataset.items():
             lemma = entry.exchange.get("0", "").lower()
-            if lemma and lemma != key and lemma in dataset:
+            if (
+                lemma
+                and lemma != key
+                and lemma in dataset
+                and not is_more_common_headword(key, lemma)
+            ):
                 self._inflections[key] = lemma
 
         for key, entry in dataset.items():
@@ -138,7 +165,9 @@ class LemmaResolver:
             for infl_key in _INFLECTION_KEYS:
                 form = entry.exchange.get(infl_key)
                 if form:
-                    self._inflections.setdefault(form.lower(), lemma)
+                    form = form.lower()
+                    if not is_more_common_headword(form, lemma):
+                        self._inflections.setdefault(form, lemma)
 
     def resolve(self, token: str) -> str | None:
         """Return the vocabulary head word for ``token`` or ``None``."""

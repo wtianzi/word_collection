@@ -15,6 +15,8 @@ Keep these beside each novel:
 - A `decoded/` directory containing UTF-8 source batches of 50 chapter-parts each, plus a manifest.
 - `base_screen_reference.md`, the authoritative living canon and terminology ledger.
 - A `translation/` directory containing ordered chapter files and `translation_progress.md`.
+- When requested, an `intermediate_polished/` directory containing each chapter's reviewed and polished version, saved immediately after its individual review passes rather than waiting for the entire batch. Preserve the numbered working filename and maintain explicit chapter-level review status.
+- A `final_polished/` directory containing only the verified, publication-ready batch files and their integrity manifests.
 
 Read the entire reference and the end of the preceding translated chapter before translating a new section. If the source contradicts an earlier assumption, correct the reference and check affected translation files.
 
@@ -32,16 +34,30 @@ Read the entire reference and the end of the preceding translated chapter before
 
 Treat later user comments as amendments to the active project rules. Apply them to subsequent work immediately and revise already translated text when the comment requires retroactive consistency. Update the project reference with novel-specific decisions. When feedback expresses a reusable translation workflow, quality rule, or output convention, also update this skill file so later novel projects inherit it. Do not add a one-off story fact to the general skill.
 
+## Model and review workflow
+
+Use this three-stage workflow for long novel batches when the named models are available:
+
+1. **Bulk translation — GPT-5.6 Sol, medium reasoning.** Translate each chapter-part into its own working file, maintain the canon reference and progress ledger continuously, and complete the chapter-level quality gates. Sol medium is the default for sustained translation because the task needs strong prose and continuity without spending flagship-level reasoning on every paragraph.
+2. **Cross-chapter review — GPT-6 Astra.** Before merging or deleting any working files, have Astra review the completed batch against the decoded Chinese source, `base_screen_reference.md`, and the preceding translated context. Check omissions, additions, names, pronouns, ranks, numbers, equipment ownership, combat mechanics, timeline continuity, repeated or deprecated terminology, chapter transitions, character voice, and native English prose. Apply every accepted correction to the per-part working files, update the reference and progress ledger, and rerun the chapter-level quality gates.
+3. **Deterministic merge, verification, and publication — script, not a language model.** After Astra review passes, use the repository merge script to concatenate the reviewed working files in numeric order. Verify the manifest, hashes, chapter count and order, first and last headings, nonempty content, and absence of untranslated Chinese or placeholders. Publish the verified plain-text result and its manifest under `final_polished/`; only then run the script's verified deletion mode.
+
+Do not use Astra merely to concatenate files; literary and continuity review are its role, while byte-preserving merge and integrity checks belong to deterministic tooling. If either named model is unavailable, use the closest quality-equivalent model and record the substitution in `translation_progress.md`; do not silently skip the separate cross-chapter review stage.
+
 ## Translation files and 50-chapter merging
 
 - Translate each chapter-part into a separate, zero-padded working file. Its sequence number must match the decoded manifest's global chapter-part number.
 - Keep working files until every one of the corresponding 50-part source batch has passed the quality gates.
-- Then concatenate the 50 translations in numeric source order into one UTF-8 Markdown batch file. Do not summarize, deduplicate, or alter text during merging.
+- If the user requests intermediate polished chapters, review and save them chapter by chapter in the requested order, then merge the completed batch from those intermediate files. Retain these reviewable intermediates and working files when the user or current project progress instructions request retention; that takes precedence over the default cleanup steps below.
+- Then concatenate the 50 translations in numeric source order into one UTF-8 plain-text (`.txt`) batch file unless the user explicitly requests another format. Do not summarize, deduplicate, or alter prose during merging. Remove working-format Markdown syntax such as heading prefixes, emphasis markers, and blockquote markers from a plain-text deliverable while preserving titles, volume/arc/chapter headings, editorial notes, and paragraph breaks as readable text.
+- Include the translated front matter (title, author, synopsis, and any other retained opening material) once at the beginning of the first merged batch. It does not count toward the 50 chapter-parts. Verify its inclusion separately from the chapter count and record it in the manifest; a standalone working copy is not a substitute for inclusion in the deliverable.
 - In this repository, use `media/merge_translation_batch.py` for the verified merge-and-cleanup operation; run it without `--delete` for validation first, then rerun with `--delete` only after reviewing its manifest.
 - Verify the merged file contains all 50 unique chapter headings in order, has the expected first and last headings, and preserves the combined body of every working file.
-- Only after that verification succeeds, delete those 50 per-chapter working files. This deletion is authorized only for files already represented in the verified merged batch.
+- After literary review and deterministic verification both succeed, place the publication copy in `final_polished/`. Name a complete 50-part range `chapters_NNN_NNN.txt`, using zero-padded global part numbers—for example, `chapters_001_050.txt` and `chapters_051_100.txt`. Store its integrity manifest beside it as `<final-filename>.manifest.json`.
+- Treat files in `translation/` as working or audit artifacts, not final deliverables. Retain useful progress and review records there, but remove redundant merged drafts after their verified replacement exists in `final_polished/`.
+- Only after the final polished file and its colocated manifest have both been verified, delete the represented per-chapter working files or superseded merged draft. This deletion is authorized only for files already represented in the verified final output. Never delete the untouched source, decoded batches, canon reference, progress ledger, or review record as part of batch cleanup.
 - The final source batch may contain fewer than 50 parts; merge it after every remaining part is complete using the same checks.
-- Record the merged output and removal of working files in `translation_progress.md`. Never mark a batch complete based only on file count.
+- Record the exact `final_polished/` output path, manifest path, verification result, and removal of working files in `translation_progress.md`. Never mark a batch complete based only on file count.
 
 ## Translation standard
 

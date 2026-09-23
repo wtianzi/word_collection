@@ -16,7 +16,7 @@ from .progress import ProgressStore
 from .textscan import LemmaResolver, iter_word_spans, lookup_ecdict, tokenize
 
 # Familiarity colours, matching the flashcard UI.
-FAM_COLOR = {1: "#ef4444", 2: "#f59e0b", 3: "#eab308", 4: "#84cc16", 5: "#22c55e"}
+FAM_COLOR = {1: "#ef4444", 2: "#f59e0b", 3: "#84cc16", 4: "#16c0cc", 5: "#58585b"}
 UNKNOWN_COLOR = "#a855f7"  # word outside the graded vocabulary
 READING_PAGE_SIZE = 100 * 1024
 

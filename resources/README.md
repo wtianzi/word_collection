@@ -27,6 +27,19 @@ Free English→Chinese dictionary (ECDICT). ~770,000 entries. UTF-8, comma-separ
 
 This single file is the primary dictionary: it contains Chinese translations **plus** COCA (`frq`) and BNC (`bnc`) frequency ranks and exam-syllabus tags, so most lookups and filtering can be done from it alone.
 
+
+### `morphemes_colingoldberg.json`
+
+Supplementary English morpheme data from
+[colingoldberg/morphemes](https://github.com/colingoldberg/morphemes),
+licensed under MIT; the original notice is in
+`dict/morphemes_colingoldberg_LICENSE`. The source contains 2,435 entries
+with forms, meanings, positions, and example words. The reading popup uses
+these examples only when the indicated form matches the word in its stated
+position. This yields about 13,000 distinct word lookups. Its meanings are in
+English and appear only when no curated Chinese explanation or confirmed
+Chinese affix analysis is available.
+
 ## `wordlists/` — English word lists
 
 Source for all lists below: https://github.com/mahavivo/english-wordlists

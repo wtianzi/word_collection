@@ -39,7 +39,13 @@ DEFAULT_TARGET = PROJECT_ROOT / "media" / "to_read"
 OUTPUT_DIR = PROJECT_ROOT / "media" / "output"
 
 # Familiarity color scheme, matching the web UI.
-_FAM_COLOR = {1: "#fecaca", 2: "#fed7aa", 3: "#fef08a"}
+_FAM_COLOR = {
+    1: "#ef4444",
+    2: "#f59e0b",
+    3: "#84cc16",
+    4: "#16c0cc",
+    5: "#58585b",
+}
 _UNKNOWN_COLOR = "#e9d5ff"  # word outside the graded vocabulary
 
 
