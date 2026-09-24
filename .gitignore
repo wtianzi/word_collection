@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # App runtime data (learner progress) and derived cache
-# data/
+data/
 
 # User media: uploads, reading sources, and generated output
 # media/
